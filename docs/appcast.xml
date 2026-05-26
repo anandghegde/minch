@@ -1,0 +1,50 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/"
+     version="2.0">
+    <channel>
+        <title>Minch</title>
+        <link>https://minch.app/appcast.xml</link>
+        <description>Latest Minch releases.</description>
+        <language>en</language>
+
+        <!--
+            Template — replace the example item below for each release.
+
+            Required attributes on <enclosure>:
+              url                          — direct link to the signed .zip / .dmg
+              sparkle:version              — CFBundleVersion (build number) of the new release
+              sparkle:shortVersionString    — CFBundleShortVersionString (user-facing version)
+              length                        — file size in bytes
+              type                          — "application/octet-stream"
+              sparkle:edSignature          — EdDSA signature of the binary (sign_update tool from Sparkle)
+
+            Minimum system version comes from <sparkle:minimumSystemVersion>.
+
+            To produce sparkle:edSignature:
+              sign_update path/to/Minch-1.0.0.zip
+            using the same private EdDSA key that pairs with SUPublicEDKey in Info.plist.
+        -->
+
+        <item>
+            <title>Version 1.0.0</title>
+            <pubDate>Sun, 01 Jan 2026 12:00:00 +0000</pubDate>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
+                <h2>1.0.0 — initial release</h2>
+                <ul>
+                    <li>Library, transfers, files, and search.</li>
+                    <li>Built-in AVKit player with resume position.</li>
+                    <li>Menu bar quick-add and ⌘K command palette.</li>
+                </ul>
+            ]]></description>
+            <enclosure
+                url="https://minch.app/releases/Minch-1.0.0.zip"
+                sparkle:version="1"
+                sparkle:shortVersionString="1.0.0"
+                length="0"
+                type="application/octet-stream"
+                sparkle:edSignature="REPLACE_WITH_ED_SIGNATURE" />
+        </item>
+    </channel>
+</rss>
