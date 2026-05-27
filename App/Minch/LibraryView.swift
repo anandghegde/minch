@@ -17,6 +17,7 @@ struct LibraryView: View {
     @State private var focusMagnet: Bool = false
     @State private var searchQuery: String = ""
     @State private var showAccount: Bool = false
+    @State private var paletteInitialAction: CommandPalette.Action? = nil
 
     @Query(sort: \StoredTransfer.addedAt, order: .reverse)
     private var rows: [StoredTransfer]
@@ -31,10 +32,12 @@ struct LibraryView: View {
                 videoCount: smartCount(.videos),
                 audioCount: smartCount(.audio),
                 recentCount: recentRows.count,
-                isRefreshing: model.isRefreshing,
-                refresh: { Task { await model.refresh() } },
-                signOut: { Task { await model.signOut() } },
-                openAccount: { showAccount = true }
+                openAccount: { showAccount = true },
+                openSettings: { NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil) },
+                addMagnet: {
+                    paletteInitialAction = .addMagnet
+                    paletteOpen = true
+                }
             )
             .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
         } detail: {
@@ -66,8 +69,9 @@ struct LibraryView: View {
                 .keyboardShortcut("n", modifiers: [.command])
                 .hidden()
         )
-        .sheet(isPresented: $paletteOpen) {
+        .sheet(isPresented: $paletteOpen, onDismiss: { paletteInitialAction = nil }) {
             CommandPalette(
+                initialAction: paletteInitialAction,
                 onAction: handlePaletteAction,
                 onDismiss: { paletteOpen = false }
             )
@@ -169,21 +173,23 @@ private struct LibrarySidebar: View {
     let videoCount: Int
     let audioCount: Int
     let recentCount: Int
-    let isRefreshing: Bool
-    let refresh: () -> Void
-    let signOut: () -> Void
     let openAccount: () -> Void
+    let openSettings: () -> Void
+    let addMagnet: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button(action: openAccount) {
-                AccountChip(account: account)
-            }
-            .buttonStyle(.plain)
-            .help("View account details")
-            .padding(.horizontal, MinchSpacing.m)
+        VStack(spacing: 0) {
+            MinchAccountChip(
+                name: account.email ?? "",
+                email: account.email,
+                planName: account.planName,
+                isSubscribed: account.isSubscribed ?? false,
+                action: openAccount
+            )
             .padding(.top, MinchSpacing.l)
-            .padding(.bottom, MinchSpacing.m)
+            .padding(.horizontal, MinchSpacing.s)
+
+            Spacer().frame(height: MinchSpacing.m)
 
             List(selection: $selection) {
                 ForEach(LibrarySection.Group.allCases, id: \.self) { group in
@@ -192,7 +198,8 @@ private struct LibrarySidebar: View {
                             MinchSidebarRow(
                                 systemImage: section.systemImage,
                                 title: section.title,
-                                count: count(for: section)
+                                count: count(for: section),
+                                isSelected: selection == section
                             )
                             .tag(section)
                         }
@@ -202,22 +209,10 @@ private struct LibrarySidebar: View {
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
 
-            Divider().background(Color.minchHairline)
-
-            HStack(spacing: MinchSpacing.s) {
-                if isRefreshing {
-                    ProgressView().controlSize(.small)
-                }
-                Button("Refresh", action: refresh)
-                    .buttonStyle(.minch(.ghost))
-                    .disabled(isRefreshing)
-
-                Spacer()
-
-                Button("Sign out", action: signOut)
-                    .buttonStyle(.minch(.ghost))
-            }
-            .padding(MinchSpacing.s)
+            MinchSidebarFooter(
+                onOpenSettings: openSettings,
+                onAdd: addMagnet
+            )
         }
         .background(Color.minchSurfaceSidebar)
     }
@@ -230,57 +225,6 @@ private struct LibrarySidebar: View {
         case .audio: audioCount
         case .recent: recentCount
         }
-    }
-}
-
-private struct AccountChip: View {
-    let account: UserAccount
-
-    var body: some View {
-        HStack(spacing: MinchSpacing.s) {
-            Circle()
-                .fill(LinearGradient(
-                    colors: [.minchBolt, .minchCurrent],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-                .frame(width: 28, height: 28)
-                .overlay(
-                    Text(initial)
-                        .font(.minchCaption.bold())
-                        .foregroundStyle(.white)
-                )
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text(account.planName)
-                    .font(.minchHeadline)
-                    .foregroundStyle(.primary)
-                if let email = account.email, !email.isEmpty {
-                    Text(email)
-                        .font(.minchCaption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-    }
-
-    private var initial: String {
-        if let email = account.email, let first = email.first {
-            return String(first).uppercased()
-        }
-        return "M"
-    }
-
-    private var accessibilityLabel: String {
-        if let email = account.email, !email.isEmpty {
-            return "\(account.planName) plan, signed in as \(email)"
-        }
-        return "\(account.planName) plan"
     }
 }
 
