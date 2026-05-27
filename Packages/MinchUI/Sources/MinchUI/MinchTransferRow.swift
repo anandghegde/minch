@@ -71,11 +71,27 @@ public struct MinchTransferRow: View {
     private let content: Content
     private let isExpanded: Bool
     private let onToggle: (() -> Void)?
+    private let onPlay: ((Content.File?) -> Void)?
+    private let onReveal: ((Content.File?) -> Void)?
+    private let onCopyLink: (() -> Void)?
+    private let onDelete: (() -> Void)?
 
-    public init(content: Content, isExpanded: Bool = false, onToggle: (() -> Void)? = nil) {
+    public init(
+        content: Content,
+        isExpanded: Bool = false,
+        onToggle: (() -> Void)? = nil,
+        onPlay: ((Content.File?) -> Void)? = nil,
+        onReveal: ((Content.File?) -> Void)? = nil,
+        onCopyLink: (() -> Void)? = nil,
+        onDelete: (() -> Void)? = nil
+    ) {
         self.content = content
         self.isExpanded = isExpanded
         self.onToggle = onToggle
+        self.onPlay = onPlay
+        self.onReveal = onReveal
+        self.onCopyLink = onCopyLink
+        self.onDelete = onDelete
     }
 
     public var body: some View {
