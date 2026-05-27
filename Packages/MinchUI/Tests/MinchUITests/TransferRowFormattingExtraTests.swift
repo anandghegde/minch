@@ -268,3 +268,51 @@ struct NameAttributedStringTests {
         #expect(aHasNoColor)
     }
 }
+
+
+@Suite("MinchTransferRow.Content surface")
+struct ContentSurfaceTests {
+    @Test func existingInitStillCompilesWithDefaults() {
+        let c = MinchTransferRow.Content(
+            name: "Foo.mkv",
+            phase: .active,
+            sizeBytes: 100,
+            downloadSpeed: 10,
+            progress: 0.5
+        )
+        #expect(c.id == "")
+        #expect(c.etaSeconds == nil)
+        #expect(c.queuePosition == nil)
+        #expect(c.errorMessage == nil)
+        #expect(c.addedAt == nil)
+        #expect(c.hasPlayableMedia == false)
+        #expect(c.files.isEmpty)
+    }
+
+    @Test func newFieldsArePropagated() {
+        let added = Date(timeIntervalSince1970: 1_000)
+        let file = MinchTransferRow.Content.File(id: "f1", name: "a.mkv", sizeBytes: 42, isPlayable: true)
+        let c = MinchTransferRow.Content(
+            id: "t1",
+            name: "Foo.mkv",
+            phase: .done,
+            sizeBytes: 100,
+            downloadSpeed: 0,
+            progress: 1.0,
+            seeds: nil,
+            peers: nil,
+            etaSeconds: 0,
+            queuePosition: nil,
+            errorMessage: nil,
+            addedAt: added,
+            hasPlayableMedia: true,
+            files: [file]
+        )
+        #expect(c.id == "t1")
+        #expect(c.addedAt == added)
+        #expect(c.hasPlayableMedia == true)
+        #expect(c.files.count == 1)
+        #expect(c.files[0].name == "a.mkv")
+        #expect(c.files[0].isPlayable == true)
+    }
+}

@@ -6,6 +6,7 @@ import SwiftUI
 /// adapt `StoredTransfer` or `Transfer` to these fields.
 public struct MinchTransferRow: View {
     public struct Content: Equatable, Sendable {
+        public let id: String
         public let name: String
         public let phase: MinchStatusPhase
         public let sizeBytes: Int64
@@ -13,8 +14,30 @@ public struct MinchTransferRow: View {
         public let progress: Double
         public let seeds: Int?
         public let peers: Int?
+        public let etaSeconds: Int?
+        public let queuePosition: Int?
+        public let errorMessage: String?
+        public let addedAt: Date?
+        public let hasPlayableMedia: Bool
+        public let files: [File]
 
-        public init(name: String, phase: MinchStatusPhase, sizeBytes: Int64, downloadSpeed: Int64, progress: Double, seeds: Int? = nil, peers: Int? = nil) {
+        public init(
+            id: String = "",
+            name: String,
+            phase: MinchStatusPhase,
+            sizeBytes: Int64,
+            downloadSpeed: Int64,
+            progress: Double,
+            seeds: Int? = nil,
+            peers: Int? = nil,
+            etaSeconds: Int? = nil,
+            queuePosition: Int? = nil,
+            errorMessage: String? = nil,
+            addedAt: Date? = nil,
+            hasPlayableMedia: Bool = false,
+            files: [File] = []
+        ) {
+            self.id = id
             self.name = name
             self.phase = phase
             self.sizeBytes = sizeBytes
@@ -22,6 +45,26 @@ public struct MinchTransferRow: View {
             self.progress = progress
             self.seeds = seeds
             self.peers = peers
+            self.etaSeconds = etaSeconds
+            self.queuePosition = queuePosition
+            self.errorMessage = errorMessage
+            self.addedAt = addedAt
+            self.hasPlayableMedia = hasPlayableMedia
+            self.files = files
+        }
+
+        public struct File: Equatable, Sendable, Identifiable {
+            public let id: String
+            public let name: String
+            public let sizeBytes: Int64
+            public let isPlayable: Bool
+
+            public init(id: String, name: String, sizeBytes: Int64, isPlayable: Bool) {
+                self.id = id
+                self.name = name
+                self.sizeBytes = sizeBytes
+                self.isPlayable = isPlayable
+            }
         }
     }
 
