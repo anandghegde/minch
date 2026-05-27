@@ -16,6 +16,9 @@ public struct MinchTransferProgressRing: View {
         self.progress = MinchTransferRow.clampedProgress(progress)
     }
 
+    @State private var pulseOpacity: Double = 1.0
+    @State private var shakeOffset: CGFloat = 0
+
     public var body: some View {
         ZStack {
             Circle()
@@ -31,9 +34,30 @@ public struct MinchTransferProgressRing: View {
             }
 
             MinchStatusGlyph(phase)
+                .opacity(phase == .active ? pulseOpacity : 1.0)
+                .offset(x: shakeOffset)
         }
         .frame(width: 28, height: 28)
         .accessibilityHidden(true)
+        .onAppear { applyMotionForCurrentPhase() }
+        .onChange(of: phase) { _, _ in applyMotionForCurrentPhase() }
+    }
+
+    private func applyMotionForCurrentPhase() {
+        pulseOpacity = 1.0
+        shakeOffset = 0
+        switch phase {
+        case .active:
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                pulseOpacity = 0.7
+            }
+        case .error:
+            withAnimation(.easeInOut(duration: 0.06).repeatCount(4, autoreverses: true)) {
+                shakeOffset = 2
+            }
+        default:
+            break
+        }
     }
 
     private var trimEnd: CGFloat {
