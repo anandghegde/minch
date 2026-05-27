@@ -17,11 +17,36 @@ struct ThemeTests {
         #expect(MinchRadius.m < MinchRadius.l)
     }
 
-    @Test func surfaceTokensExist() {
+    @Test func surfaceRampTokensExist() {
+        _ = Color.minchSurfaceWindow
+        _ = Color.minchSurfaceSidebar
         _ = Color.minchSurfacePrimary
-        _ = Color.minchSurfaceElevated
+        _ = Color.minchSurfaceCard
+        _ = Color.minchSurfaceCardHover
+        _ = Color.minchSurfaceOverlay
         _ = Color.minchSurfaceSunken
         _ = Color.minchHairline
         _ = Color.minchSelection
+    }
+
+    @Test func typographyTokensExist() {
+        _ = Font.minchDisplay
+        _ = Font.minchTitle
+        _ = Font.minchHeadline
+        _ = Font.minchBody
+        _ = Font.minchMetadata
+        _ = Font.minchCallout
+        _ = Font.minchCaption
+        _ = Font.minchMono
+    }
+
+    @Test func motionTokensExist() {
+        _ = MinchMotion.snap
+        _ = MinchMotion.smooth
+    }
+
+    @Test func elevationTokensExist() {
+        _ = MinchElevation.resting
+        _ = MinchElevation.hover
     }
 }
