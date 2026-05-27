@@ -157,6 +157,34 @@ public extension MinchTransferRow {
         if minutes == 0 { return "\(hours)h left" }
         return "\(hours)h \(minutes)m left"
     }
+
+
+    struct ActionEnablement: Equatable, Sendable {
+        public let play: Bool
+        public let reveal: Bool
+        public let copyLink: Bool
+        public let delete: Bool
+
+        public init(play: Bool, reveal: Bool, copyLink: Bool, delete: Bool) {
+            self.play = play
+            self.reveal = reveal
+            self.copyLink = copyLink
+            self.delete = delete
+        }
+    }
+
+    /// Decides which of the four cluster icons are enabled for a given phase.
+    /// Delete and Copy Link are always enabled; Reveal requires `.done`;
+    /// Play requires `.done` AND `hasPlayableMedia == true`.
+    static func actionEnablement(phase: MinchStatusPhase, hasPlayableMedia: Bool) -> ActionEnablement {
+        let isDone = (phase == .done)
+        return ActionEnablement(
+            play: isDone && hasPlayableMedia,
+            reveal: isDone,
+            copyLink: true,
+            delete: true
+        )
+    }
 }
 
 #Preview {
