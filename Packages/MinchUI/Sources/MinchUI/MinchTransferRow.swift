@@ -173,17 +173,17 @@ public extension MinchTransferRow {
         }
     }
 
-    /// Decides which of the four cluster icons are enabled for a given phase.
-    /// Delete and Copy Link are always enabled; Reveal requires `.done`;
-    /// Play requires `.done` AND `hasPlayableMedia == true`.
+    /// Per-phase action gating. Icons stay in the cluster either way — `false`
+    /// means dimmed (`.tertiary` + `.disabled(true)`) so the row never reflows.
     static func actionEnablement(phase: MinchStatusPhase, hasPlayableMedia: Bool) -> ActionEnablement {
-        let isDone = (phase == .done)
-        return ActionEnablement(
-            play: isDone && hasPlayableMedia,
-            reveal: isDone,
-            copyLink: true,
-            delete: true
-        )
+        switch phase {
+        case .idle:
+            return ActionEnablement(play: false, reveal: false, copyLink: false, delete: true)
+        case .queued, .active, .paused, .error:
+            return ActionEnablement(play: false, reveal: false, copyLink: true, delete: true)
+        case .done:
+            return ActionEnablement(play: hasPlayableMedia, reveal: true, copyLink: true, delete: true)
+        }
     }
 }
 

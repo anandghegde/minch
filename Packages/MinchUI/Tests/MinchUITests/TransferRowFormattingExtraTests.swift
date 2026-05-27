@@ -35,55 +35,43 @@ struct EtaTextTests {
 
 @Suite("MinchTransferRow.actionEnablement")
 struct ActionEnablementTests {
-    @Test func idleDisablesPlayAndReveal() {
-        let e = MinchTransferRow.actionEnablement(phase: .idle, hasPlayableMedia: true)
-        #expect(e.play == false)
-        #expect(e.reveal == false)
-        #expect(e.copyLink == true)
-        #expect(e.delete == true)
+    @Test func idlePhaseOnlyDeleteIsLive() {
+        let a = MinchTransferRow.actionEnablement(phase: .idle, hasPlayableMedia: false)
+        #expect(a == .init(play: false, reveal: false, copyLink: false, delete: true))
     }
 
-    @Test func queuedDisablesPlayAndReveal() {
-        let e = MinchTransferRow.actionEnablement(phase: .queued, hasPlayableMedia: true)
-        #expect(e.play == false)
-        #expect(e.reveal == false)
+    @Test func queuedPhaseHasCopyLinkAndDelete() {
+        let a = MinchTransferRow.actionEnablement(phase: .queued, hasPlayableMedia: false)
+        #expect(a == .init(play: false, reveal: false, copyLink: true, delete: true))
     }
 
-    @Test func activeDisablesPlayAndReveal() {
-        let e = MinchTransferRow.actionEnablement(phase: .active, hasPlayableMedia: true)
-        #expect(e.play == false)
-        #expect(e.reveal == false)
+    @Test func activePhaseHasCopyLinkAndDelete() {
+        let a = MinchTransferRow.actionEnablement(phase: .active, hasPlayableMedia: false)
+        #expect(a == .init(play: false, reveal: false, copyLink: true, delete: true))
     }
 
-    @Test func pausedDisablesPlayAndReveal() {
-        let e = MinchTransferRow.actionEnablement(phase: .paused, hasPlayableMedia: true)
-        #expect(e.play == false)
-        #expect(e.reveal == false)
+    @Test func pausedPhaseHasCopyLinkAndDelete() {
+        let a = MinchTransferRow.actionEnablement(phase: .paused, hasPlayableMedia: false)
+        #expect(a == .init(play: false, reveal: false, copyLink: true, delete: true))
     }
 
-    @Test func errorDisablesPlayAndReveal() {
-        let e = MinchTransferRow.actionEnablement(phase: .error, hasPlayableMedia: true)
-        #expect(e.play == false)
-        #expect(e.reveal == false)
+    @Test func errorPhaseHasCopyLinkAndDelete() {
+        let a = MinchTransferRow.actionEnablement(phase: .error, hasPlayableMedia: false)
+        #expect(a == .init(play: false, reveal: false, copyLink: true, delete: true))
     }
 
-    @Test func doneEnablesRevealAlways() {
-        let e = MinchTransferRow.actionEnablement(phase: .done, hasPlayableMedia: false)
-        #expect(e.reveal == true)
-        #expect(e.play == false)
+    @Test func donePhaseWithoutMediaDimsPlay() {
+        let a = MinchTransferRow.actionEnablement(phase: .done, hasPlayableMedia: false)
+        #expect(a == .init(play: false, reveal: true, copyLink: true, delete: true))
     }
 
-    @Test func doneWithPlayableMediaEnablesPlay() {
-        let e = MinchTransferRow.actionEnablement(phase: .done, hasPlayableMedia: true)
-        #expect(e.play == true)
-        #expect(e.reveal == true)
+    @Test func donePhaseWithMediaEnablesPlay() {
+        let a = MinchTransferRow.actionEnablement(phase: .done, hasPlayableMedia: true)
+        #expect(a == .init(play: true, reveal: true, copyLink: true, delete: true))
     }
 
-    @Test func deleteAndCopyLinkAlwaysEnabled() {
-        for phase in [MinchStatusPhase.idle, .queued, .active, .paused, .error, .done] {
-            let e = MinchTransferRow.actionEnablement(phase: phase, hasPlayableMedia: false)
-            #expect(e.delete == true, "delete must be enabled for \(phase)")
-            #expect(e.copyLink == true, "copyLink must be enabled for \(phase)")
-        }
+    @Test func mediaFlagIsIgnoredOutsideDone() {
+        let a = MinchTransferRow.actionEnablement(phase: .active, hasPlayableMedia: true)
+        #expect(a.play == false)
     }
 }
