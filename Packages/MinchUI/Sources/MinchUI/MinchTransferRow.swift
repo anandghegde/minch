@@ -175,7 +175,7 @@ public extension MinchTransferRow {
 
     /// Per-phase action gating. Icons stay in the cluster either way — `false`
     /// means dimmed (`.tertiary` + `.disabled(true)`) so the row never reflows.
-    static func actionEnablement(phase: MinchStatusPhase, hasPlayableMedia: Bool) -> ActionEnablement {
+    nonisolated static func actionEnablement(phase: MinchStatusPhase, hasPlayableMedia: Bool) -> ActionEnablement {
         switch phase {
         case .idle:
             return ActionEnablement(play: false, reveal: false, copyLink: false, delete: true)
