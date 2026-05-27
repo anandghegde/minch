@@ -806,47 +806,103 @@ private struct TransferDisclosure: View {
     @State private var renaming: Bool = false
     @State private var renameDraft: String = ""
 
+    private func makeRowContent() -> MinchTransferRow.Content {
+        let phase = MinchStatusPhase(transferStatusRaw: row.statusRaw)
+        let etaSeconds: Int? = row.eta.map { Int($0.rounded()) }
+        let sortedFiles = row.files.sorted(by: { $0.name < $1.name })
+        let downloadedFiles = sortedFiles.filter { $0.isDownloaded }
+        let mappedFiles: [MinchTransferRow.Content.File] = downloadedFiles.map { f in
+            let kind = MediaKind.detect(name: f.name, mime: f.mime)
+            return MinchTransferRow.Content.File(
+                id: f.id,
+                name: f.name,
+                sizeBytes: f.sizeBytes,
+                isPlayable: kind != .other && f.localPath.map { FileManager.default.fileExists(atPath: $0) } ?? false
+            )
+        }
+        let hasPlayableMedia = mappedFiles.contains(where: { $0.isPlayable })
+        return MinchTransferRow.Content(
+            id: row.id,
+            name: row.name,
+            phase: phase,
+            sizeBytes: row.sizeBytes,
+            downloadSpeed: row.downloadSpeed,
+            progress: row.progress,
+            seeds: row.seeds,
+            peers: row.peers,
+            etaSeconds: etaSeconds,
+            queuePosition: nil,
+            errorMessage: row.errorMessage,
+            addedAt: row.addedAt,
+            hasPlayableMedia: hasPlayableMedia,
+            files: mappedFiles
+        )
+    }
+
+    private func handlePlay(_ file: MinchTransferRow.Content.File?) {
+        // Find the underlying stored file by id; if nil arg, pick first playable.
+        let stored: StoredTransferFile? = {
+            if let f = file {
+                return row.files.first(where: { $0.id == f.id })
+            }
+            return row.files.first(where: {
+                $0.isDownloaded
+                && $0.localPath.map { FileManager.default.fileExists(atPath: $0) } ?? false
+                && MediaKind.detect(name: $0.name, mime: $0.mime) != .other
+            })
+        }()
+        guard let stored, let path = stored.localPath else { return }
+        let kind = MediaKind.detect(name: stored.name, mime: stored.mime)
+        onPlay(PlaybackTarget(
+            id: stored.id,
+            file: stored,
+            url: URL(fileURLWithPath: path),
+            title: stored.name,
+            kind: kind
+        ))
+    }
+
+    private func handleReveal(_ file: MinchTransferRow.Content.File?) {
+        let path: String? = {
+            if let f = file {
+                return row.files.first(where: { $0.id == f.id })?.localPath
+            }
+            return row.files.first(where: { $0.isDownloaded })?.localPath
+        }()
+        guard let path else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    private func handleCopyLink() {
+        // Transfer-level copy link → first downloaded file. AppModel exposes
+        // copyDownloadLink(transferID:fileID:).
+        guard let fileID = row.files.first(where: { $0.isDownloaded })?.id else { return }
+        Task { await model.copyDownloadLink(transferID: row.id, fileID: fileID) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                MinchTransferRow(
-                    content: .init(
-                        name: row.name,
-                        phase: MinchStatusPhase(transferStatusRaw: row.statusRaw),
-                        sizeBytes: row.sizeBytes,
-                        downloadSpeed: row.downloadSpeed,
-                        progress: row.progress,
-                        seeds: row.seeds,
-                        peers: row.peers
-                    ),
-                    isExpanded: isExpanded,
-                    onToggle: toggle
-                )
-                .contextMenu {
-                    Button("Rename…") {
-                        renameDraft = row.name
-                        renaming = true
-                    }
-                    Button(editingTags ? "Hide tag editor" : "Edit tags…") {
-                        editingTags.toggle()
-                    }
-                    Divider()
-                    Button("Delete from TorBox", role: .destructive) {
-                        confirmingDelete = true
-                    }
-                    .disabled(model.deletingTransferIDs.contains(row.id))
+            MinchTransferRow(
+                content: makeRowContent(),
+                isExpanded: isExpanded,
+                onToggle: toggle,
+                onPlay: { file in handlePlay(file) },
+                onReveal: { file in handleReveal(file) },
+                onCopyLink: { handleCopyLink() },
+                onDelete: { confirmingDelete = true }
+            )
+            .contextMenu {
+                Button("Rename…") {
+                    renameDraft = row.name
+                    renaming = true
                 }
-
-                Button {
+                Button(editingTags ? "Hide tag editor" : "Edit tags…") {
+                    editingTags.toggle()
+                }
+                Divider()
+                Button("Delete from TorBox", role: .destructive) {
                     confirmingDelete = true
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(Color.minchDanger.opacity(0.8))
-                        .padding(MinchSpacing.s)
                 }
-                .buttonStyle(.plain)
-                .help("Delete from TorBox")
-                .accessibilityLabel("Delete from TorBox")
                 .disabled(model.deletingTransferIDs.contains(row.id))
             }
             .confirmationDialog(
