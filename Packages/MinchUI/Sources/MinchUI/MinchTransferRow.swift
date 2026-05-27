@@ -165,11 +165,7 @@ public struct MinchTransferRow: View {
     }
 
     private var metaLine: some View {
-        let enablement = MinchTransferRow.actionEnablement(
-            phase: content.phase, hasPlayableMedia: content.hasPlayableMedia
-        )
-        _ = enablement // referenced in actionCluster; keep capture explicit for readability
-        return Group {
+        Group {
             switch content.phase {
             case .idle:
                 Text(MinchTransferRow.sizeText(content.sizeBytes))
