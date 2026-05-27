@@ -159,7 +159,7 @@ public extension MinchTransferRow {
     }
 
 
-    public struct ActionEnablement: Equatable, Sendable {
+    struct ActionEnablement: Equatable, Sendable {
         public let play: Bool
         public let reveal: Bool
         public let copyLink: Bool
