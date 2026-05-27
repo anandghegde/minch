@@ -22,32 +22,31 @@ public extension Color {
     static let minchWarning = Color(red: 0.95, green: 0.69, blue: 0.20)
     static let minchDanger = Color(red: 0.95, green: 0.34, blue: 0.36)
 
-    // Surface ramp (v2 — opaque z-stack from window to overlay).
-    static let minchSurfaceWindow     = Color(white: 0.05)
-    static let minchSurfaceSidebar    = Color(white: 0.06)
-    static let minchSurfacePrimary    = Color(white: 0.08)
-    static let minchSurfaceCard       = Color(white: 0.10)
-    static let minchSurfaceCardHover  = Color(white: 0.13)
-    static let minchSurfaceOverlay    = Color(white: 0.14)
+    static let minchSurfaceWindow = Color(white: 0.05)
+    static let minchSurfaceSidebar = Color(white: 0.06)
+    static let minchSurfacePrimary = Color(white: 0.08)
+    static let minchSurfaceCard = Color(white: 0.10)
+    static let minchSurfaceCardHover = Color(white: 0.13)
+    static let minchSurfaceOverlay = Color(white: 0.14)
 
-    static let minchSurfaceSunken     = Color.white.opacity(0.04)
-    static let minchHairline          = Color.white.opacity(0.06)
-    static let minchSelection         = Color.minchBolt.opacity(0.18)
+    static let minchSurfaceSunken = Color.white.opacity(0.04)
+    static let minchHairline = Color.white.opacity(0.06)
+    static let minchSelection = Color.minchBolt.opacity(0.18)
 }
 
 public extension Font {
-    static let minchDisplay   = Font.system(size: 28, weight: .bold)
-    static let minchTitle     = Font.system(size: 20, weight: .bold)
-    static let minchHeadline  = Font.system(size: 15, weight: .semibold)
-    static let minchBody      = Font.system(size: 13, weight: .regular)
-    static let minchMetadata  = Font.system(size: 11, weight: .medium)
-    static let minchCallout   = Font.system(size: 12, weight: .regular)
-    static let minchCaption   = Font.system(size: 11, weight: .regular)
-    static let minchMono      = Font.system(size: 12, weight: .regular, design: .monospaced)
+    static let minchDisplay = Font.system(size: 28, weight: .bold)
+    static let minchTitle = Font.system(size: 20, weight: .bold)
+    static let minchHeadline = Font.system(size: 15, weight: .semibold)
+    static let minchBody = Font.system(size: 13, weight: .regular)
+    static let minchMetadata = Font.system(size: 11, weight: .medium)
+    static let minchCallout = Font.system(size: 12, weight: .regular)
+    static let minchCaption = Font.system(size: 11, weight: .regular)
+    static let minchMono = Font.system(size: 12, weight: .regular, design: .monospaced)
 }
 
 public enum MinchMotion {
-    public static let snap: Animation   = .snappy(duration: 0.20, extraBounce: 0)
+    public static let snap: Animation = .snappy(duration: 0.20, extraBounce: 0)
     public static let smooth: Animation = .smooth(duration: 0.30, extraBounce: 0)
 }
 

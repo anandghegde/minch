@@ -40,13 +40,13 @@ struct ThemeTests {
         _ = Font.minchMono
     }
 
-    @Test func motionTokensExist() {
+    @Test func motionTokensCompile() {
         _ = MinchMotion.snap
         _ = MinchMotion.smooth
     }
 
-    @Test func elevationTokensExist() {
-        _ = MinchElevation.resting
-        _ = MinchElevation.hover
+    @Test func elevationHoverIsStrongerThanResting() {
+        #expect(MinchElevation.hover.shadowRadius > MinchElevation.resting.shadowRadius)
+        #expect(MinchElevation.hover.borderWidth >= MinchElevation.resting.borderWidth)
     }
 }
