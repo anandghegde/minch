@@ -90,8 +90,6 @@ struct LibraryView: View {
             base = rows.filter { hasMedia($0, kind: .audio) }
         case .recent:
             base = recentRows
-        case .settings:
-            return []
         }
         let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return base }
@@ -226,7 +224,6 @@ private struct LibrarySidebar: View {
         case .videos: videoCount
         case .audio: audioCount
         case .recent: recentCount
-        case .settings: 0
         }
     }
 }
@@ -301,49 +298,45 @@ private struct LibraryContent: View {
             )
             .ignoresSafeArea()
 
-            if selection == .settings {
-                SettingsView(model: model)
-            } else {
-                VStack(spacing: 0) {
-                    ContentHeader(title: selection.title, count: rows.count)
+            VStack(spacing: 0) {
+                ContentHeader(title: selection.title, count: rows.count)
 
-                    SearchBar(query: $searchQuery)
+                SearchBar(query: $searchQuery)
 
-                    if selection == .active {
-                        AddMagnetBar(model: model, focusRequested: $focusMagnet)
-                    }
+                if selection == .active {
+                    AddMagnetBar(model: model, focusRequested: $focusMagnet)
+                }
 
-                    if let message = model.refreshError {
-                        ErrorBanner(
-                            message: message,
-                            retryTitle: "Retry",
-                            onRetry: { Task { await model.refresh() } },
-                            onDismiss: { model.refreshError = nil }
-                        )
-                        .padding(.horizontal, MinchSpacing.xxl)
-                        .padding(.vertical, MinchSpacing.s)
-                    }
+                if let message = model.refreshError {
+                    ErrorBanner(
+                        message: message,
+                        retryTitle: "Retry",
+                        onRetry: { Task { await model.refresh() } },
+                        onDismiss: { model.refreshError = nil }
+                    )
+                    .padding(.horizontal, MinchSpacing.xxl)
+                    .padding(.vertical, MinchSpacing.s)
+                }
 
-                    if let message = model.infoBanner {
-                        InfoBanner(
-                            message: message,
-                            onDismiss: { model.infoBanner = nil }
-                        )
-                        .padding(.horizontal, MinchSpacing.xxl)
-                        .padding(.vertical, MinchSpacing.s)
-                        .task(id: message) {
-                            try? await Task.sleep(nanoseconds: 2_500_000_000)
-                            if model.infoBanner == message {
-                                model.infoBanner = nil
-                            }
+                if let message = model.infoBanner {
+                    InfoBanner(
+                        message: message,
+                        onDismiss: { model.infoBanner = nil }
+                    )
+                    .padding(.horizontal, MinchSpacing.xxl)
+                    .padding(.vertical, MinchSpacing.s)
+                    .task(id: message) {
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        if model.infoBanner == message {
+                            model.infoBanner = nil
                         }
                     }
+                }
 
-                    if rows.isEmpty {
-                        LibraryEmpty(selection: selection)
-                    } else {
-                        LibraryList(rows: rows, model: model, externalPlaybackTarget: $paletteTarget)
-                    }
+                if rows.isEmpty {
+                    LibraryEmpty(selection: selection)
+                } else {
+                    LibraryList(rows: rows, model: model, externalPlaybackTarget: $paletteTarget)
                 }
             }
         }
@@ -711,7 +704,6 @@ private struct LibraryEmpty: View {
         case .videos: "No video files"
         case .audio: "No audio files"
         case .recent: "Nothing added recently"
-        case .settings: ""
         }
     }
 
@@ -722,7 +714,6 @@ private struct LibraryEmpty: View {
         case .videos: "Video files across your transfers will land here."
         case .audio: "Audio files across your transfers will land here."
         case .recent: "Transfers added in the last 7 days will appear here."
-        case .settings: ""
         }
     }
 }

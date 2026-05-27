@@ -1,14 +1,14 @@
 import Foundation
 
 /// Top-level sidebar selection (PRD §3.2). Sprint 5 shipped Active/Downloaded;
-/// Sprint 9 adds Smart Collections (videos, audio, recent). Trash arrives later.
+/// Sprint 9 adds Smart Collections (videos, audio, recent). Settings is no
+/// longer a selectable row — it lives on the sidebar footer.
 enum LibrarySection: Hashable, Identifiable, CaseIterable {
     case active
     case downloaded
     case videos
     case audio
     case recent
-    case settings
 
     var id: String {
         switch self {
@@ -17,7 +17,6 @@ enum LibrarySection: Hashable, Identifiable, CaseIterable {
         case .videos: "videos"
         case .audio: "audio"
         case .recent: "recent"
-        case .settings: "settings"
         }
     }
 
@@ -28,7 +27,6 @@ enum LibrarySection: Hashable, Identifiable, CaseIterable {
         case .videos: "Videos"
         case .audio: "Audio"
         case .recent: "Recent"
-        case .settings: "Settings"
         }
     }
 
@@ -39,7 +37,6 @@ enum LibrarySection: Hashable, Identifiable, CaseIterable {
         case .videos: "film"
         case .audio: "music.note"
         case .recent: "clock"
-        case .settings: "gearshape"
         }
     }
 
@@ -47,20 +44,17 @@ enum LibrarySection: Hashable, Identifiable, CaseIterable {
         switch self {
         case .active, .downloaded: .library
         case .videos, .audio, .recent: .smart
-        case .settings: .system
         }
     }
 
     enum Group: String, CaseIterable {
         case library
         case smart
-        case system
 
         var title: String {
             switch self {
             case .library: "Library"
-            case .smart: "Smart"
-            case .system: "System"
+            case .smart: "Smart Collections"
             }
         }
     }
