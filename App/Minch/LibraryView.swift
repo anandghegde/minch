@@ -810,14 +810,18 @@ private struct TransferDisclosure: View {
         let phase = MinchStatusPhase(transferStatusRaw: row.statusRaw)
         let etaSeconds: Int? = row.eta.map { Int($0.rounded()) }
         let sortedFiles = row.files.sorted(by: { $0.name < $1.name })
-        let downloadedFiles = sortedFiles.filter { $0.isDownloaded }
-        let mappedFiles: [MinchTransferRow.Content.File] = downloadedFiles.map { f in
+        let mappedFiles: [MinchTransferRow.Content.File] = sortedFiles.map { f in
             let kind = MediaKind.detect(name: f.name, mime: f.mime)
+            let hasLocalFile = f.isDownloaded && f.localPath.map { FileManager.default.fileExists(atPath: $0) } ?? false
             return MinchTransferRow.Content.File(
                 id: f.id,
                 name: f.name,
                 sizeBytes: f.sizeBytes,
-                isPlayable: kind != .other && f.localPath.map { FileManager.default.fileExists(atPath: $0) } ?? false
+                isPlayable: hasLocalFile && kind != .other,
+                isDownloaded: f.isDownloaded,
+                canStream: kind != .other,
+                downloadProgress: model.inflightFileIDs.contains(f.id) ? (model.downloadProgress[f.id] ?? 0) : nil,
+                isCopyingLink: model.copyingFileIDs.contains(f.id)
             )
         }
         let hasPlayableMedia = mappedFiles.contains(where: { $0.isPlayable })
@@ -880,6 +884,43 @@ private struct TransferDisclosure: View {
         Task { await model.copyDownloadLink(transferID: row.id, fileID: fileID) }
     }
 
+    private func handleStream(_ file: MinchTransferRow.Content.File) {
+        guard let stored = row.files.first(where: { $0.id == file.id }) else { return }
+        let kind = MediaKind.detect(name: stored.name, mime: stored.mime)
+        Task {
+            let url = await model.streamURL(transferID: row.id, fileID: stored.id)
+            if let url {
+                onPlay(PlaybackTarget(
+                    id: stored.id,
+                    file: stored,
+                    url: url,
+                    title: stored.name,
+                    kind: kind
+                ))
+            }
+        }
+    }
+
+    private func handleDownload(_ file: MinchTransferRow.Content.File) {
+        guard let stored = row.files.first(where: { $0.id == file.id }) else { return }
+        Task {
+            await model.downloadFile(
+                transferID: row.id,
+                fileID: stored.id,
+                transferName: row.name,
+                fileName: stored.name
+            )
+        }
+    }
+
+    private func handleCancelDownload(_ file: MinchTransferRow.Content.File) {
+        model.cancelDownload(fileID: file.id)
+    }
+
+    private func handleCopyFileLink(_ file: MinchTransferRow.Content.File) {
+        Task { await model.copyDownloadLink(transferID: row.id, fileID: file.id) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             MinchTransferRow(
@@ -889,7 +930,11 @@ private struct TransferDisclosure: View {
                 onPlay: { file in handlePlay(file) },
                 onReveal: { file in handleReveal(file) },
                 onCopyLink: { handleCopyLink() },
-                onDelete: { confirmingDelete = true }
+                onDelete: { confirmingDelete = true },
+                onStream: { file in handleStream(file) },
+                onDownload: { file in handleDownload(file) },
+                onCancelDownload: { file in handleCancelDownload(file) },
+                onCopyFileLink: { file in handleCopyFileLink(file) }
             )
             .contextMenu {
                 Button("Rename…") {
@@ -947,11 +992,6 @@ private struct TransferDisclosure: View {
                 .padding(.bottom, MinchSpacing.s)
             }
 
-            if isExpanded {
-                FileList(row: row, model: model, onPlay: onPlay)
-                    .padding(.horizontal, MinchSpacing.l)
-                    .padding(.bottom, MinchSpacing.l)
-            }
         }
     }
 
@@ -1057,155 +1097,3 @@ private struct TagRow: View {
     }
 }
 
-private struct FileList: View {
-    let row: StoredTransfer
-    @Bindable var model: AppModel
-    let onPlay: (PlaybackTarget) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: MinchSpacing.xs) {
-            if row.files.isEmpty {
-                Text("No files yet")
-                    .font(.minchCaption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(row.files.sorted(by: { $0.name < $1.name })) { file in
-                    FileRow(transfer: row, file: file, model: model, onPlay: onPlay)
-                }
-            }
-        }
-        .padding(.leading, MinchSpacing.xl)
-    }
-}
-
-private struct FileRow: View {
-    let transfer: StoredTransfer
-    let file: StoredTransferFile
-    @Bindable var model: AppModel
-    let onPlay: (PlaybackTarget) -> Void
-    @State private var isStreaming = false
-
-    private var mediaKind: MediaKind {
-        MediaKind.detect(name: file.name, mime: file.mime)
-    }
-
-    private var hasLocalFile: Bool {
-        guard file.isDownloaded, let path = file.localPath else { return false }
-        return FileManager.default.fileExists(atPath: path)
-    }
-
-    private var playable: Bool {
-        hasLocalFile && mediaKind != .other
-    }
-
-    var body: some View {
-        HStack(spacing: MinchSpacing.s) {
-            Image(systemName: iconName)
-                .foregroundStyle(file.isDownloaded ? Color.minchSuccess : .secondary)
-                .font(.minchCaption)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(file.name)
-                    .font(.minchCallout)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                Text(ByteCountFormatter.string(fromByteCount: file.sizeBytes, countStyle: .file))
-                    .font(.minchCaption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if playable, let path = file.localPath {
-                Button("Play") {
-                    onPlay(PlaybackTarget(
-                        id: file.id,
-                        file: file,
-                        url: URL(fileURLWithPath: path),
-                        title: file.name,
-                        kind: mediaKind
-                    ))
-                }
-                .buttonStyle(.minch(.primary))
-            }
-            if hasLocalFile, let path = file.localPath {
-                Button("Reveal") { reveal(path: path) }
-                    .buttonStyle(.minch(.secondary))
-            } else if model.inflightFileIDs.contains(file.id) {
-                let progress = model.downloadProgress[file.id]
-                ProgressView(value: progress ?? 0)
-                    .progressViewStyle(.linear)
-                    .tint(Color.minchBolt)
-                    .frame(width: 80)
-                if let progress {
-                    Text(String(format: "%.0f%%", progress * 100))
-                        .font(.minchMono)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Button("Cancel") {
-                    model.cancelDownload(fileID: file.id)
-                }
-                .buttonStyle(.minch(.destructive))
-            } else {
-                if mediaKind != .other {
-                    Button(isStreaming ? "Opening…" : "Stream") {
-                        Task {
-                            isStreaming = true
-                            let url = await model.streamURL(transferID: transfer.id, fileID: file.id)
-                            isStreaming = false
-                            if let url {
-                                onPlay(PlaybackTarget(
-                                    id: file.id,
-                                    file: file,
-                                    url: url,
-                                    title: file.name,
-                                    kind: mediaKind
-                                ))
-                            }
-                        }
-                    }
-                    .buttonStyle(.minch(.secondary))
-                    .disabled(isStreaming)
-                }
-                Button("Download") {
-                    Task {
-                        await model.downloadFile(
-                            transferID: transfer.id,
-                            fileID: file.id,
-                            transferName: transfer.name,
-                            fileName: file.name
-                        )
-                    }
-                }
-                .buttonStyle(.minch(.primary))
-            }
-            Button {
-                Task {
-                    await model.copyDownloadLink(transferID: transfer.id, fileID: file.id)
-                }
-            } label: {
-                Image(systemName: "link")
-            }
-            .buttonStyle(.minch(.ghost))
-            .help("Copy download link")
-            .accessibilityLabel("Copy download link")
-            .disabled(model.copyingFileIDs.contains(file.id))
-        }
-        .padding(.vertical, MinchSpacing.xs)
-    }
-
-    private var iconName: String {
-        if file.isDownloaded { return "checkmark.circle.fill" }
-        switch mediaKind {
-        case .video: return "film"
-        case .audio: return "music.note"
-        case .other: return "doc"
-        }
-    }
-
-    private func reveal(path: String) {
-        let url = URL(fileURLWithPath: path)
-        NSWorkspace.shared.activateFileViewerSelecting([url])
-    }
-}

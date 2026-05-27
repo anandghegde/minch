@@ -58,12 +58,29 @@ public struct MinchTransferRow: View {
             public let name: String
             public let sizeBytes: Int64
             public let isPlayable: Bool
+            public let isDownloaded: Bool
+            public let canStream: Bool
+            public let downloadProgress: Double?
+            public let isCopyingLink: Bool
 
-            public init(id: String, name: String, sizeBytes: Int64, isPlayable: Bool) {
+            public init(
+                id: String,
+                name: String,
+                sizeBytes: Int64,
+                isPlayable: Bool,
+                isDownloaded: Bool = false,
+                canStream: Bool = false,
+                downloadProgress: Double? = nil,
+                isCopyingLink: Bool = false
+            ) {
                 self.id = id
                 self.name = name
                 self.sizeBytes = sizeBytes
                 self.isPlayable = isPlayable
+                self.isDownloaded = isDownloaded
+                self.canStream = canStream
+                self.downloadProgress = downloadProgress
+                self.isCopyingLink = isCopyingLink
             }
         }
     }
@@ -75,6 +92,10 @@ public struct MinchTransferRow: View {
     private let onReveal: ((Content.File?) -> Void)?
     private let onCopyLink: (() -> Void)?
     private let onDelete: (() -> Void)?
+    private let onStream: ((Content.File) -> Void)?
+    private let onDownload: ((Content.File) -> Void)?
+    private let onCancelDownload: ((Content.File) -> Void)?
+    private let onCopyFileLink: ((Content.File) -> Void)?
 
     public init(
         content: Content,
@@ -83,7 +104,11 @@ public struct MinchTransferRow: View {
         onPlay: ((Content.File?) -> Void)? = nil,
         onReveal: ((Content.File?) -> Void)? = nil,
         onCopyLink: (() -> Void)? = nil,
-        onDelete: (() -> Void)? = nil
+        onDelete: (() -> Void)? = nil,
+        onStream: ((Content.File) -> Void)? = nil,
+        onDownload: ((Content.File) -> Void)? = nil,
+        onCancelDownload: ((Content.File) -> Void)? = nil,
+        onCopyFileLink: ((Content.File) -> Void)? = nil
     ) {
         self.content = content
         self.isExpanded = isExpanded
@@ -92,6 +117,10 @@ public struct MinchTransferRow: View {
         self.onReveal = onReveal
         self.onCopyLink = onCopyLink
         self.onDelete = onDelete
+        self.onStream = onStream
+        self.onDownload = onDownload
+        self.onCancelDownload = onCancelDownload
+        self.onCopyFileLink = onCopyFileLink
     }
 
     public var body: some View {
@@ -113,7 +142,11 @@ public struct MinchTransferRow: View {
                             FileRow(
                                 file: file,
                                 onPlay: file.isPlayable ? { onPlay?(file) } : nil,
-                                onReveal: { onReveal?(file) }
+                                onReveal: { onReveal?(file) },
+                                onStream: onStream.map { cb in { cb(file) } },
+                                onDownload: onDownload.map { cb in { cb(file) } },
+                                onCancelDownload: onCancelDownload.map { cb in { cb(file) } },
+                                onCopyFileLink: onCopyFileLink.map { cb in { cb(file) } }
                             )
                         }
                     }
@@ -292,43 +325,88 @@ public struct MinchTransferRow: View {
     private struct FileRow: View {
         let file: Content.File
         let onPlay: (() -> Void)?
-        let onReveal: () -> Void
+        let onReveal: (() -> Void)?
+        let onStream: (() -> Void)?
+        let onDownload: (() -> Void)?
+        let onCancelDownload: (() -> Void)?
+        let onCopyFileLink: (() -> Void)?
 
         var body: some View {
             HStack(spacing: MinchSpacing.s) {
-                Text(file.name)
+                // Leading icon
+                Image(systemName: leadingIcon)
+                    .foregroundStyle(file.isDownloaded ? Color.minchSuccess : Color.secondary)
                     .font(.minchCaption)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                Spacer(minLength: MinchSpacing.s)
-                Text(MinchTransferRow.sizeText(file.sizeBytes))
-                    .font(.minchCaption)
-                    .foregroundStyle(.secondary)
-                if let onPlay {
-                    Button(action: onPlay) {
-                        Image(systemName: "play.fill")
-                            .font(.minchCaption)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 18, height: 18)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Play")
-                    .accessibilityLabel("Play \(file.name)")
-                }
-                Button(action: onReveal) {
-                    Image(systemName: "folder")
+
+                // Name + size
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(file.name)
+                        .font(.minchCaption)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(MinchTransferRow.sizeText(file.sizeBytes))
                         .font(.minchCaption)
                         .foregroundStyle(.secondary)
-                        .frame(width: 18, height: 18)
-                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .help("Reveal in Finder")
-                .accessibilityLabel("Reveal \(file.name) in Finder")
+
+                Spacer()
+
+                // Trailing button cluster
+                if let onPlay, file.isPlayable {
+                    Button("Play", action: onPlay)
+                        .buttonStyle(.minch(.primary))
+                        .accessibilityLabel("Play \(file.name)")
+                }
+                if file.isDownloaded, let onReveal {
+                    Button("Reveal", action: onReveal)
+                        .buttonStyle(.minch(.secondary))
+                        .accessibilityLabel("Reveal \(file.name) in Finder")
+                } else if let progress = file.downloadProgress {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                        .tint(Color.minchBolt)
+                        .frame(width: 80)
+                    Text(String(format: "%.0f%%", progress * 100))
+                        .font(.minchMono)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    if let onCancelDownload {
+                        Button("Cancel", action: onCancelDownload)
+                            .buttonStyle(.minch(.destructive))
+                            .accessibilityLabel("Cancel download of \(file.name)")
+                    }
+                } else {
+                    if file.canStream, let onStream {
+                        Button("Stream", action: onStream)
+                            .buttonStyle(.minch(.secondary))
+                            .accessibilityLabel("Stream \(file.name)")
+                    }
+                    if let onDownload {
+                        Button("Download", action: onDownload)
+                            .buttonStyle(.minch(.primary))
+                            .accessibilityLabel("Download \(file.name)")
+                    }
+                }
+
+                // Copy-link — always present
+                Button {
+                    onCopyFileLink?()
+                } label: {
+                    Image(systemName: "link")
+                }
+                .buttonStyle(.minch(.ghost))
+                .help("Copy download link")
+                .accessibilityLabel("Copy download link for \(file.name)")
+                .disabled(file.isCopyingLink || onCopyFileLink == nil)
             }
             .padding(.horizontal, MinchSpacing.l)
-            .frame(minHeight: 32)
+            .padding(.vertical, MinchSpacing.xs)
+        }
+
+        private var leadingIcon: String {
+            if file.isDownloaded { return "checkmark.circle.fill" }
+            if file.canStream { return "film" }
+            return "doc"
         }
     }
 }
