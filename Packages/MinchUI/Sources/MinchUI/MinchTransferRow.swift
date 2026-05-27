@@ -99,7 +99,7 @@ public struct MinchTransferRow: View {
         .buttonStyle(.plain)
         .background(
             RoundedRectangle(cornerRadius: MinchRadius.m, style: .continuous)
-                .fill(Color.minchSurfaceSunken)
+                .fill(Color.minchSurfaceCard)
         )
         .overlay(
             RoundedRectangle(cornerRadius: MinchRadius.m, style: .continuous)
