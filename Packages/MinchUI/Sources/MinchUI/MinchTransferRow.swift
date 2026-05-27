@@ -240,6 +240,67 @@ public extension MinchTransferRow {
             return sizeText(sizeBytes)
         }
     }
+
+
+    /// Returns the 0-based character indices into `name` of separator
+    /// characters (`.`, `_`, `-`) that sit *between* two word characters.
+    /// These are the indices the view body renders at reduced opacity.
+    nonisolated static func dimmedSeparatorIndices(_ name: String) -> Set<Int> {
+        let chars = Array(name)
+        guard chars.count >= 3 else { return [] }
+        var out: Set<Int> = []
+        for i in 1..<(chars.count - 1) {
+            let c = chars[i]
+            guard c == "." || c == "_" || c == "-" else { continue }
+            let prev = chars[i - 1]
+            let next = chars[i + 1]
+            if MinchTransferRow.isNameWordChar(prev), MinchTransferRow.isNameWordChar(next) {
+                out.insert(i)
+            }
+        }
+        return out
+    }
+
+    /// Builds an `AttributedString` with `.tracking(-0.2)` and per-character
+    /// `.foregroundColor` overrides at 0.45 opacity for any separator returned
+    /// by `dimmedSeparatorIndices`.
+    nonisolated static func nameAttributedString(_ name: String) -> AttributedString {
+        var attr = AttributedString(name)
+        attr.tracking = -0.2
+        let dims = dimmedSeparatorIndices(name)
+        guard !dims.isEmpty else { return attr }
+        let chars = Array(name)
+        let dimColor = Color.primary.opacity(0.45)
+        for index in dims {
+            let target = String(chars[index])
+            if let range = attr.range(of: target, options: [.literal]) {
+                var current = range
+                var charsBefore = MinchTransferRow.utf16Distance(from: attr.startIndex, to: current.lowerBound, in: attr)
+                while charsBefore != index {
+                    let next = attr[current.upperBound..<attr.endIndex].range(of: target, options: [.literal])
+                    guard let next else { break }
+                    current = next
+                    charsBefore = MinchTransferRow.utf16Distance(from: attr.startIndex, to: current.lowerBound, in: attr)
+                }
+                if charsBefore == index {
+                    attr[current].foregroundColor = dimColor
+                }
+            }
+        }
+        return attr
+    }
+
+    /// Internal — character (not UTF-16) distance between two AttributedString indices.
+    nonisolated static func utf16Distance(from start: AttributedString.Index,
+                                          to end: AttributedString.Index,
+                                          in attr: AttributedString) -> Int {
+        attr.characters.distance(from: start, to: end)
+    }
+
+    /// Word char for separator-dimming purposes: ASCII letter or digit.
+    nonisolated static func isNameWordChar(_ c: Character) -> Bool {
+        c.isLetter || c.isNumber
+    }
 }
 
 #Preview {

@@ -202,3 +202,52 @@ struct RelativeAddedShortTests {
         #expect(MinchTransferRow.relativeAddedShort(from: past, now: now) == "2d")
     }
 }
+
+
+@Suite("MinchTransferRow.dimmedSeparatorIndices")
+struct DimmedSeparatorIndicesTests {
+    @Test func emptyStringHasNoDims() {
+        #expect(MinchTransferRow.dimmedSeparatorIndices("") == [])
+    }
+
+    @Test func noSeparatorsReturnsEmpty() {
+        #expect(MinchTransferRow.dimmedSeparatorIndices("PlainName") == [])
+    }
+
+    @Test func dotsBetweenWordCharsAreDimmed() {
+        #expect(MinchTransferRow.dimmedSeparatorIndices("a.b") == [1])
+    }
+
+    @Test func leadingSeparatorNotDimmed() {
+        #expect(MinchTransferRow.dimmedSeparatorIndices(".foo") == [])
+    }
+
+    @Test func trailingSeparatorNotDimmed() {
+        #expect(MinchTransferRow.dimmedSeparatorIndices("foo.") == [])
+    }
+
+    @Test func mixedSeparatorsAllDimmed() {
+        let s = "The.Matrix_1999-2160p"
+        let dims = MinchTransferRow.dimmedSeparatorIndices(s)
+        #expect(dims == [3, 10, 15])
+    }
+
+    @Test func consecutiveSeparatorsOnlyDimWhenBothSidesAreWordChars() {
+        #expect(MinchTransferRow.dimmedSeparatorIndices("a..b") == [])
+    }
+}
+
+@Suite("MinchTransferRow.nameAttributedString")
+struct NameAttributedStringTests {
+    @Test func returnsAttributedStringMatchingInputCharacters() {
+        let name = "a.b"
+        let attr = MinchTransferRow.nameAttributedString(name)
+        #expect(String(attr.characters) == name)
+    }
+
+    @Test func plainNameProducesAttributedString() {
+        let name = "PlainName"
+        let attr = MinchTransferRow.nameAttributedString(name)
+        #expect(String(attr.characters) == name)
+    }
+}
