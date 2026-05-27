@@ -250,4 +250,21 @@ struct NameAttributedStringTests {
         let attr = MinchTransferRow.nameAttributedString(name)
         #expect(String(attr.characters) == name)
     }
+
+    @Test func separatorBetweenWordCharsHasMutedForeground() {
+        let attr = MinchTransferRow.nameAttributedString("a.b")
+        var coloredRunCount = 0
+        var aHasNoColor = false
+        for run in attr.runs {
+            let runText = String(attr[run.range].characters)
+            if run.attributes.foregroundColor != nil {
+                coloredRunCount += 1
+            }
+            if runText == "a" {
+                aHasNoColor = (run.attributes.foregroundColor == nil)
+            }
+        }
+        #expect(coloredRunCount >= 1)
+        #expect(aHasNoColor)
+    }
 }

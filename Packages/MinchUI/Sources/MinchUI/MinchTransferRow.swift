@@ -241,7 +241,6 @@ public extension MinchTransferRow {
         }
     }
 
-
     /// Returns the 0-based character indices into `name` of separator
     /// characters (`.`, `_`, `-`) that sit *between* two word characters.
     /// These are the indices the view body renders at reduced opacity.
@@ -263,14 +262,15 @@ public extension MinchTransferRow {
 
     /// Builds an `AttributedString` with `.tracking(-0.2)` and per-character
     /// `.foregroundColor` overrides at 0.45 opacity for any separator returned
-    /// by `dimmedSeparatorIndices`.
+    /// by `dimmedSeparatorIndices`. Tracking and opacity values come from the
+    /// Transfer Card Redesign design spec.
     nonisolated static func nameAttributedString(_ name: String) -> AttributedString {
         var attr = AttributedString(name)
-        attr.tracking = -0.2
+        attr.tracking = -0.2 // Per Transfer Card Redesign spec
         let dims = dimmedSeparatorIndices(name)
         guard !dims.isEmpty else { return attr }
         let chars = Array(name)
-        let dimColor = Color.primary.opacity(0.45)
+        let dimColor = Color.primary.opacity(0.45) // Per Transfer Card Redesign spec
         for index in dims {
             let target = String(chars[index])
             if let range = attr.range(of: target, options: [.literal]) {
