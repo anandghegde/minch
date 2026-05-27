@@ -216,7 +216,7 @@ private struct LibrarySidebar: View {
             }
             .padding(MinchSpacing.s)
         }
-        .background(Color.minchSurfacePrimary)
+        .background(Color.minchSurfaceSidebar)
     }
 
     private func count(for section: LibrarySection) -> Int {
@@ -295,7 +295,7 @@ private struct LibraryContent: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.minchSurfacePrimary, Color.minchSurfaceElevated],
+                colors: [Color.minchSurfacePrimary, Color.minchSurfaceCard],
                 startPoint: .top,
                 endPoint: .bottom
             )

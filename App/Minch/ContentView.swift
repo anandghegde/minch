@@ -21,7 +21,7 @@ private struct SplashView: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color(white: 0.06), Color(white: 0.10)],
+                colors: [Color.minchSurfaceWindow, Color.minchSurfacePrimary],
                 startPoint: .top,
                 endPoint: .bottom
             )

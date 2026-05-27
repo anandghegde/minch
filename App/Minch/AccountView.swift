@@ -47,7 +47,7 @@ struct AccountView: View {
                 .buttonStyle(.minch(.ghost))
         }
         .padding(MinchSpacing.l)
-        .background(Color.minchSurfaceElevated)
+        .background(Color.minchSurfaceCard)
     }
 
     private var planSection: some View {

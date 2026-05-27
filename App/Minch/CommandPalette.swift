@@ -45,7 +45,7 @@ struct CommandPalette: View {
             resultsList
         }
         .frame(width: 560, height: 420)
-        .background(Color.minchSurfaceElevated)
+        .background(Color.minchSurfaceOverlay)
         .overlay(
             RoundedRectangle(cornerRadius: MinchRadius.l)
                 .stroke(Color.minchHairline, lineWidth: 1)
