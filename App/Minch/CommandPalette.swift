@@ -29,8 +29,19 @@ struct CommandPalette: View {
         }
     }
 
+    let initialAction: Action?
     let onAction: (Action) -> Void
     let onDismiss: () -> Void
+
+    init(
+        initialAction: Action? = nil,
+        onAction: @escaping (Action) -> Void,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.initialAction = initialAction
+        self.onAction = onAction
+        self.onDismiss = onDismiss
+    }
 
     @Query(sort: \StoredTransfer.addedAt, order: .reverse)
     private var transfers: [StoredTransfer]
@@ -52,7 +63,13 @@ struct CommandPalette: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: MinchRadius.l))
         .preferredColorScheme(.dark)
-        .onAppear { selectedIndex = 0 }
+        .onAppear {
+            if let initialAction, let index = results.firstIndex(where: { $0.action == initialAction }) {
+                selectedIndex = index
+            } else {
+                selectedIndex = 0
+            }
+        }
     }
 
     private var searchField: some View {
