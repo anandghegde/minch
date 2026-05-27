@@ -30,7 +30,7 @@ public struct MinchSidebarRow: View {
 
             if let count, count > 0 {
                 Text("\(count)")
-                    .font(.minchCaption)
+                    .font(.minchMetadata)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 6)
