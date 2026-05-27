@@ -7,16 +7,24 @@ public struct MinchButtonStyle: ButtonStyle {
     private let variant: Variant
     public init(_ variant: Variant = .primary) { self.variant = variant }
 
+    @ViewBuilder
     public func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        let base = configuration.label
             .font(.minchHeadline)
             .padding(.horizontal, MinchSpacing.m)
             .padding(.vertical, MinchSpacing.s)
-            .background(background(pressed: configuration.isPressed))
             .foregroundStyle(foreground)
-            .clipShape(RoundedRectangle(cornerRadius: MinchRadius.m, style: .continuous))
             .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.85), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : MinchMotion.snap, value: configuration.isPressed)
+
+        switch variant {
+        case .secondary:
+            base.minchHoverable(cornerRadius: MinchRadius.m)
+        case .primary, .ghost, .destructive:
+            base
+                .background(background(pressed: configuration.isPressed))
+                .clipShape(RoundedRectangle(cornerRadius: MinchRadius.m, style: .continuous))
+        }
     }
 
     @ViewBuilder
@@ -28,12 +36,12 @@ public struct MinchButtonStyle: ButtonStyle {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-        case .secondary:
-            Color.secondary.opacity(0.15)
         case .ghost:
             Color.clear
         case .destructive:
             Color.minchDanger.opacity(0.85)
+        case .secondary:
+            EmptyView()
         }
     }
 
