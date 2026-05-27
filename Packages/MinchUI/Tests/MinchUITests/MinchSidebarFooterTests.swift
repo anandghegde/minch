@@ -12,7 +12,7 @@ struct MinchSidebarFooterTests {
         #expect(MinchSidebarFooter.iconColor(isHovered: true) == Color.minchCurrent)
     }
 
-    @Test func settingsClosureFiresWhenInvoked() {
+    @Test @MainActor func settingsClosureFiresWhenInvoked() {
         var settingsFired = 0
         let footer = MinchSidebarFooter(
             onOpenSettings: { settingsFired += 1 },
@@ -22,7 +22,7 @@ struct MinchSidebarFooterTests {
         #expect(settingsFired == 1)
     }
 
-    @Test func addClosureFiresWhenInvoked() {
+    @Test @MainActor func addClosureFiresWhenInvoked() {
         var addFired = 0
         let footer = MinchSidebarFooter(
             onOpenSettings: {},

@@ -6,12 +6,12 @@ import SwiftUI
 /// palette in Add mode, ⌘N). Resting icons use the muted sidebar tint;
 /// hover lifts them to `.minchCurrent`.
 public struct MinchSidebarFooter: View {
-    public let onOpenSettings: @Sendable () -> Void
-    public let onAdd: @Sendable () -> Void
+    public let onOpenSettings: () -> Void
+    public let onAdd: () -> Void
 
     public init(
-        onOpenSettings: @escaping @Sendable () -> Void,
-        onAdd: @escaping @Sendable () -> Void
+        onOpenSettings: @escaping () -> Void,
+        onAdd: @escaping () -> Void
     ) {
         self.onOpenSettings = onOpenSettings
         self.onAdd = onAdd
