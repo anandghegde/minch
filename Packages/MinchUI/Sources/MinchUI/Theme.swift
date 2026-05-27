@@ -32,6 +32,7 @@ public extension Color {
     static let minchSurfaceSunken = Color.white.opacity(0.04)
     static let minchHairline = Color.white.opacity(0.06)
     static let minchSelection = Color.minchBolt.opacity(0.18)
+    static let minchSidebarIconUnselected = Color.white.opacity(0.55)
 }
 
 public extension Font {
