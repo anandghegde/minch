@@ -145,6 +145,18 @@ public extension MinchTransferRow {
         if let peers, peers > 0 { parts.append("\(peers) peers") }
         return parts.joined(separator: " · ")
     }
+
+    /// Returns "3m left" / "<1m left" / "1h 15m left". `nil` when omitted.
+    static func etaText(_ seconds: Int) -> String? {
+        guard seconds > 0 else { return nil }
+        if seconds < 60 { return "<1m left" }
+        let totalMinutes = seconds / 60
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        if hours == 0 { return "\(minutes)m left" }
+        if minutes == 0 { return "\(hours)h left" }
+        return "\(hours)h \(minutes)m left"
+    }
 }
 
 #Preview {
