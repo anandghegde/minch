@@ -1,6 +1,8 @@
 import Testing
 @testable import MinchUI
 
+import Foundation
+
 @Suite("MinchTransferRow.etaText")
 struct EtaTextTests {
     @Test func zeroSecondsIsOmitted() {
@@ -73,5 +75,130 @@ struct ActionEnablementTests {
     @Test func mediaFlagIsIgnoredOutsideDone() {
         let a = MinchTransferRow.actionEnablement(phase: .active, hasPlayableMedia: true)
         #expect(a.play == false)
+    }
+}
+
+
+@Suite("MinchTransferRow.metaPlainText")
+struct MetaPlainTextTests {
+    @Test func idleShowsSizeOnly() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .idle, sizeBytes: 2_400_000_000, downloadSpeed: 0, progress: 0,
+            etaSeconds: nil, queuePosition: nil, errorMessage: nil, addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s == "2.4 GB")
+    }
+
+    @Test func queuedWithPosition() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .queued, sizeBytes: 0, downloadSpeed: 0, progress: 0,
+            etaSeconds: nil, queuePosition: 4, errorMessage: nil, addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s == "Queued · #4")
+    }
+
+    @Test func queuedWithoutPosition() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .queued, sizeBytes: 0, downloadSpeed: 0, progress: 0,
+            etaSeconds: nil, queuePosition: nil, errorMessage: nil, addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s == "Queued")
+    }
+
+    @Test func activeWithSpeedAndEta() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .active, sizeBytes: 2_400_000_000, downloadSpeed: 18_000_000, progress: 0.5,
+            etaSeconds: 195, queuePosition: nil, errorMessage: nil, addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s.hasPrefix("2.4 GB · "))
+        #expect(s.hasSuffix(" · 3m left"))
+        #expect(s.contains("/s"))
+    }
+
+    @Test func activeOmitsZeroSpeedAndZeroEta() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .active, sizeBytes: 1_000_000, downloadSpeed: 0, progress: 0,
+            etaSeconds: 0, queuePosition: nil, errorMessage: nil, addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s == "1 MB")
+    }
+
+    @Test func pausedShowsSizeAndPercent() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .paused, sizeBytes: 2_400_000_000, downloadSpeed: 0, progress: 0.42,
+            etaSeconds: nil, queuePosition: nil, errorMessage: nil, addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s == "Paused · 2.4 GB · 42%")
+    }
+
+    @Test func errorShowsMessage() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .error, sizeBytes: 0, downloadSpeed: 0, progress: 0,
+            etaSeconds: nil, queuePosition: nil, errorMessage: "Tracker unreachable", addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s == "Tracker unreachable")
+    }
+
+    @Test func errorFallsBackWhenMessageMissing() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .error, sizeBytes: 0, downloadSpeed: 0, progress: 0,
+            etaSeconds: nil, queuePosition: nil, errorMessage: nil, addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s == "Error")
+    }
+
+    @Test func doneWithAddedAt() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let added = now.addingTimeInterval(-7_200) // 2h ago
+        let s = MinchTransferRow.metaPlainText(
+            phase: .done, sizeBytes: 18_300_000_000, downloadSpeed: 0, progress: 1.0,
+            etaSeconds: nil, queuePosition: nil, errorMessage: nil, addedAt: added,
+            now: now
+        )
+        #expect(s == "18.3 GB · added 2h ago")
+    }
+
+    @Test func doneWithoutAddedAt() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .done, sizeBytes: 18_300_000_000, downloadSpeed: 0, progress: 1.0,
+            etaSeconds: nil, queuePosition: nil, errorMessage: nil, addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s == "18.3 GB")
+    }
+}
+
+@Suite("MinchTransferRow.relativeAddedShort")
+struct RelativeAddedShortTests {
+    @Test func secondsBecomeJustNow() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let past = now.addingTimeInterval(-30)
+        #expect(MinchTransferRow.relativeAddedShort(from: past, now: now) == "just now")
+    }
+
+    @Test func minutes() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let past = now.addingTimeInterval(-180)
+        #expect(MinchTransferRow.relativeAddedShort(from: past, now: now) == "3m")
+    }
+
+    @Test func hours() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let past = now.addingTimeInterval(-3 * 3600)
+        #expect(MinchTransferRow.relativeAddedShort(from: past, now: now) == "3h")
+    }
+
+    @Test func days() {
+        let now = Date(timeIntervalSince1970: 86_400 * 10)
+        let past = now.addingTimeInterval(-2 * 86_400)
+        #expect(MinchTransferRow.relativeAddedShort(from: past, now: now) == "2d")
     }
 }

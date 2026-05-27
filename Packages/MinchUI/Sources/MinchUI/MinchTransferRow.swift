@@ -117,21 +117,21 @@ public struct MinchTransferRow: View {
 // MARK: - Formatting helpers (exposed for tests)
 
 public extension MinchTransferRow {
-    static func clampedProgress(_ value: Double) -> Double {
+    nonisolated static func clampedProgress(_ value: Double) -> Double {
         max(0, min(value, 1))
     }
 
-    static func percentText(_ progress: Double) -> String {
+    nonisolated static func percentText(_ progress: Double) -> String {
         let p = clampedProgress(progress) * 100
         return String(format: "%.0f%%", p)
     }
 
-    static func sizeText(_ bytes: Int64) -> String {
+    nonisolated static func sizeText(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 
     /// Returns `nil` when there is no useful download speed to display.
-    static func speedText(_ bytesPerSecond: Int64) -> String? {
+    nonisolated static func speedText(_ bytesPerSecond: Int64) -> String? {
         guard bytesPerSecond > 0 else { return nil }
         return ByteCountFormatter.string(fromByteCount: bytesPerSecond, countStyle: .binary) + "/s"
     }
@@ -147,7 +147,7 @@ public extension MinchTransferRow {
     }
 
     /// Returns "3m left" / "<1m left" / "1h 15m left". `nil` when omitted.
-    static func etaText(_ seconds: Int) -> String? {
+    nonisolated static func etaText(_ seconds: Int) -> String? {
         guard seconds > 0 else { return nil }
         if seconds < 60 { return "<1m left" }
         let totalMinutes = seconds / 60
@@ -183,6 +183,61 @@ public extension MinchTransferRow {
             return ActionEnablement(play: false, reveal: false, copyLink: true, delete: true)
         case .done:
             return ActionEnablement(play: hasPlayableMedia, reveal: true, copyLink: true, delete: true)
+        }
+    }
+
+
+    /// Short relative time suffix used after "added " in the done-phase meta line.
+    /// Returns "just now" / "3m" / "3h" / "2d".
+    nonisolated static func relativeAddedShort(from date: Date, now: Date = Date()) -> String {
+        let elapsed = max(0, Int(now.timeIntervalSince(date)))
+        if elapsed < 60 { return "just now" }
+        let minutes = elapsed / 60
+        if minutes < 60 { return "\(minutes)m" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours)h" }
+        let days = hours / 24
+        return "\(days)d"
+    }
+
+    /// Plain-text version of the adaptive meta line. The view body builds the
+    /// styled HStack from the same inputs; this is the testable kernel.
+    nonisolated static func metaPlainText(
+        phase: MinchStatusPhase,
+        sizeBytes: Int64,
+        downloadSpeed: Int64,
+        progress: Double,
+        etaSeconds: Int?,
+        queuePosition: Int?,
+        errorMessage: String?,
+        addedAt: Date?,
+        now: Date = Date()
+    ) -> String {
+        switch phase {
+        case .idle:
+            return sizeText(sizeBytes)
+
+        case .queued:
+            if let q = queuePosition { return "Queued · #\(q)" }
+            return "Queued"
+
+        case .active:
+            var parts: [String] = [sizeText(sizeBytes)]
+            if let speed = speedText(downloadSpeed) { parts.append(speed) }
+            if let eta = etaSeconds.flatMap({ etaText($0) }) { parts.append(eta) }
+            return parts.joined(separator: " · ")
+
+        case .paused:
+            return "Paused · \(sizeText(sizeBytes)) · \(percentText(progress))"
+
+        case .error:
+            return errorMessage ?? "Error"
+
+        case .done:
+            if let added = addedAt {
+                return "\(sizeText(sizeBytes)) · added \(relativeAddedShort(from: added, now: now)) ago"
+            }
+            return sizeText(sizeBytes)
         }
     }
 }
