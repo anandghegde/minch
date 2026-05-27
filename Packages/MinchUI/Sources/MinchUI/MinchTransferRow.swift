@@ -95,67 +95,32 @@ public struct MinchTransferRow: View {
     }
 
     public var body: some View {
-        Button(action: { onToggle?() }) {
-            HStack(spacing: MinchSpacing.l) {
-                MinchStatusGlyph(content.phase)
+        VStack(spacing: 0) {
+            collapsedRow
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(content.name)
-                        .font(.minchHeadline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    HStack(spacing: MinchSpacing.s) {
-                        Text(content.phase.label)
+            if isExpanded {
+                VStack(spacing: 0) {
+                    Divider().background(Color.minchHairline)
+                    if content.files.isEmpty {
+                        Text("No files yet.")
                             .font(.minchCaption)
                             .foregroundStyle(.secondary)
-                        Text("·")
-                            .font(.minchCaption)
-                            .foregroundStyle(.tertiary)
-                        Text(MinchTransferRow.sizeText(content.sizeBytes))
-                            .font(.minchCaption)
-                            .foregroundStyle(.secondary)
-                        if let speed = MinchTransferRow.speedText(content.downloadSpeed) {
-                            Text("·")
-                                .font(.minchCaption)
-                                .foregroundStyle(.tertiary)
-                            Text(speed)
-                                .font(.minchMono)
-                                .foregroundStyle(Color.minchCurrent)
-                        }
-                        if let swarm = MinchTransferRow.swarmText(seeds: content.seeds, peers: content.peers, phase: content.phase) {
-                            Text("·")
-                                .font(.minchCaption)
-                                .foregroundStyle(.tertiary)
-                            Text(swarm)
-                                .font(.minchCaption)
-                                .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, MinchSpacing.l)
+                            .padding(.vertical, MinchSpacing.s)
+                    } else {
+                        ForEach(content.files) { file in
+                            FileRow(
+                                file: file,
+                                onPlay: file.isPlayable ? { onPlay?(file) } : nil,
+                                onReveal: { onReveal?(file) }
+                            )
                         }
                     }
-
-                    ProgressView(value: MinchTransferRow.clampedProgress(content.progress))
-                        .progressViewStyle(.linear)
-                        .tint(content.phase == .done ? Color.minchSuccess : Color.minchBolt)
                 }
-
-                Spacer()
-
-                Text(MinchTransferRow.percentText(content.progress))
-                    .font(.minchMono)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-
-                if onToggle != nil {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.minchCaption)
-                        .foregroundStyle(.secondary)
-                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .padding(MinchSpacing.l)
-            .frame(minHeight: 64)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
         .background(
             RoundedRectangle(cornerRadius: MinchRadius.m, style: .continuous)
                 .fill(Color.minchSurfaceCard)
@@ -164,12 +129,211 @@ public struct MinchTransferRow: View {
             RoundedRectangle(cornerRadius: MinchRadius.m, style: .continuous)
                 .stroke(Color.minchHairline, lineWidth: 1)
         )
-        .accessibilityElement(children: .combine)
+        .animation(MinchMotion.smooth, value: isExpanded)
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var collapsedRow: some View {
+        HStack(spacing: MinchSpacing.l) {
+            MinchTransferProgressRing(phase: content.phase, progress: content.progress)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(MinchTransferRow.nameAttributedString(content.name))
+                    .font(.minchHeadline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                metaLine
+            }
+
+            Spacer()
+
+            actionCluster
+
+            if onToggle != nil {
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.minchCaption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+            }
+        }
+        .padding(MinchSpacing.l)
+        .frame(minHeight: 64)
+        .contentShape(Rectangle())
+        .onTapGesture { onToggle?() }
+    }
+
+    private var metaLine: some View {
+        let enablement = MinchTransferRow.actionEnablement(
+            phase: content.phase, hasPlayableMedia: content.hasPlayableMedia
+        )
+        _ = enablement // referenced in actionCluster; keep capture explicit for readability
+        return Group {
+            switch content.phase {
+            case .idle:
+                Text(MinchTransferRow.sizeText(content.sizeBytes))
+                    .font(.minchCaption)
+                    .foregroundStyle(.secondary)
+
+            case .queued:
+                HStack(spacing: MinchSpacing.s) {
+                    Text("Queued")
+                        .font(.minchCaption)
+                        .foregroundStyle(.secondary)
+                    if let q = content.queuePosition {
+                        Text("·")
+                            .font(.minchCaption)
+                            .foregroundStyle(.tertiary)
+                        Text("#\(q)")
+                            .font(.minchCaption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+            case .active:
+                HStack(spacing: MinchSpacing.s) {
+                    Text(MinchTransferRow.sizeText(content.sizeBytes))
+                        .font(.minchCaption)
+                        .foregroundStyle(.secondary)
+                    if let speed = MinchTransferRow.speedText(content.downloadSpeed) {
+                        Text("·").font(.minchCaption).foregroundStyle(.tertiary)
+                        Text(speed).font(.minchMono).foregroundStyle(Color.minchCurrent)
+                    }
+                    if let eta = content.etaSeconds.flatMap({ MinchTransferRow.etaText($0) }) {
+                        Text("·").font(.minchCaption).foregroundStyle(.tertiary)
+                        Text(eta).font(.minchCaption).foregroundStyle(.secondary)
+                    }
+                }
+
+            case .paused:
+                HStack(spacing: MinchSpacing.s) {
+                    Text("Paused").font(.minchCaption).foregroundStyle(.secondary)
+                    Text("·").font(.minchCaption).foregroundStyle(.tertiary)
+                    Text(MinchTransferRow.sizeText(content.sizeBytes))
+                        .font(.minchCaption).foregroundStyle(.secondary)
+                    Text("·").font(.minchCaption).foregroundStyle(.tertiary)
+                    Text(MinchTransferRow.percentText(content.progress))
+                        .font(.minchCaption).foregroundStyle(.secondary)
+                }
+
+            case .error:
+                Text(content.errorMessage ?? "Error")
+                    .font(.minchCaption)
+                    .foregroundStyle(Color.minchDanger)
+                    .lineLimit(1)
+
+            case .done:
+                HStack(spacing: MinchSpacing.s) {
+                    Text(MinchTransferRow.sizeText(content.sizeBytes))
+                        .font(.minchCaption).foregroundStyle(.secondary)
+                    if let added = content.addedAt {
+                        Text("·").font(.minchCaption).foregroundStyle(.tertiary)
+                        Text("added \(MinchTransferRow.relativeAddedShort(from: added)) ago")
+                            .font(.minchCaption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var actionCluster: some View {
+        let enablement = MinchTransferRow.actionEnablement(
+            phase: content.phase, hasPlayableMedia: content.hasPlayableMedia
+        )
+        let isCancelling = content.phase == .active || content.phase == .queued || content.phase == .paused
+        return HStack(spacing: MinchSpacing.s) {
+            actionIcon(
+                system: "play.fill",
+                help: "Play",
+                enabled: enablement.play,
+                action: { onPlay?(nil) }
+            )
+            actionIcon(
+                system: "folder",
+                help: "Reveal in Finder",
+                enabled: enablement.reveal,
+                action: { onReveal?(nil) }
+            )
+            actionIcon(
+                system: "link",
+                help: "Copy link",
+                enabled: enablement.copyLink,
+                action: { onCopyLink?() }
+            )
+            actionIcon(
+                system: "trash",
+                help: isCancelling ? "Cancel" : "Remove",
+                enabled: enablement.delete,
+                action: { onDelete?() }
+            )
+        }
+    }
+
+    private func actionIcon(
+        system: String,
+        help: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: system)
+                .font(.minchCaption)
+                .foregroundStyle(enabled ? .secondary : .tertiary)
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .help(help)
+        .accessibilityLabel(help)
     }
 
     private var accessibilityLabel: String {
         "\(content.name), \(content.phase.label), \(MinchTransferRow.percentText(content.progress))"
+    }
+
+    private struct FileRow: View {
+        let file: Content.File
+        let onPlay: (() -> Void)?
+        let onReveal: () -> Void
+
+        var body: some View {
+            HStack(spacing: MinchSpacing.s) {
+                Text(file.name)
+                    .font(.minchCaption)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Spacer(minLength: MinchSpacing.s)
+                Text(MinchTransferRow.sizeText(file.sizeBytes))
+                    .font(.minchCaption)
+                    .foregroundStyle(.secondary)
+                if let onPlay {
+                    Button(action: onPlay) {
+                        Image(systemName: "play.fill")
+                            .font(.minchCaption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 18, height: 18)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Play")
+                    .accessibilityLabel("Play \(file.name)")
+                }
+                Button(action: onReveal) {
+                    Image(systemName: "folder")
+                        .font(.minchCaption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Reveal in Finder")
+                .accessibilityLabel("Reveal \(file.name) in Finder")
+            }
+            .padding(.horizontal, MinchSpacing.l)
+            .frame(minHeight: 32)
+        }
     }
 }
 
@@ -364,29 +528,58 @@ public extension MinchTransferRow {
 
 #Preview {
     VStack(spacing: MinchSpacing.s) {
-        MinchTransferRow(content: .init(
-            name: "The.Big.Lebowski.1998.1080p.BluRay.x264.mkv",
-            phase: .active,
-            sizeBytes: 8_500_000_000,
-            downloadSpeed: 12_500_000,
-            progress: 0.62
-        ), onToggle: {})
+        MinchTransferRow(
+            content: .init(
+                id: "t1",
+                name: "The.Matrix.1999.2160p.UHD.BluRay.mkv",
+                phase: .active,
+                sizeBytes: 2_400_000_000,
+                downloadSpeed: 18_000_000,
+                progress: 0.62,
+                etaSeconds: 195,
+                hasPlayableMedia: false,
+                files: []
+            ),
+            onToggle: {},
+            onPlay: { _ in },
+            onReveal: { _ in },
+            onCopyLink: {},
+            onDelete: {}
+        )
 
-        MinchTransferRow(content: .init(
-            name: "Solaris.1972.Criterion.2160p.mkv",
-            phase: .done,
-            sizeBytes: 18_300_000_000,
-            downloadSpeed: 0,
-            progress: 1.0
-        ))
+        MinchTransferRow(
+            content: .init(
+                id: "t2",
+                name: "Solaris.1972.Criterion.2160p.mkv",
+                phase: .done,
+                sizeBytes: 18_300_000_000,
+                downloadSpeed: 0,
+                progress: 1.0,
+                addedAt: Date().addingTimeInterval(-7_200),
+                hasPlayableMedia: true,
+                files: [
+                    .init(id: "f1", name: "Solaris.mkv", sizeBytes: 18_300_000_000, isPlayable: true)
+                ]
+            ),
+            isExpanded: true,
+            onToggle: {},
+            onPlay: { _ in },
+            onReveal: { _ in },
+            onCopyLink: {},
+            onDelete: {}
+        )
 
-        MinchTransferRow(content: .init(
-            name: "Mishandled.tracker.torrent",
-            phase: .error,
-            sizeBytes: 1_200_000_000,
-            downloadSpeed: 0,
-            progress: 0.12
-        ))
+        MinchTransferRow(
+            content: .init(
+                id: "t3",
+                name: "Mishandled.tracker.torrent",
+                phase: .error,
+                sizeBytes: 1_200_000_000,
+                downloadSpeed: 0,
+                progress: 0.12,
+                errorMessage: "Tracker unreachable"
+            )
+        )
     }
     .padding()
     .background(Color.minchSurfacePrimary)
