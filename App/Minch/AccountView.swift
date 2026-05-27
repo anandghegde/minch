@@ -9,6 +9,7 @@ struct AccountView: View {
     @Bindable var model: AppModel
     let account: UserAccount
     let onDismiss: () -> Void
+    let signOut: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,6 +20,7 @@ struct AccountView: View {
                     planSection
                     usageSection
                     subscriptionsSection
+                    signOutSection
                     if let error = model.accountLoadError {
                         Text(error)
                             .font(.minchCaption)
@@ -106,6 +108,18 @@ struct AccountView: View {
                     subscriptionRow(sub)
                 }
             }
+        }
+    }
+
+    private var signOutSection: some View {
+        VStack(alignment: .leading, spacing: MinchSpacing.s) {
+            Text("Session")
+                .font(.minchHeadline)
+            Button("Sign out", role: .destructive) {
+                signOut()
+                onDismiss()
+            }
+            .buttonStyle(.minch(.destructive))
         }
     }
 

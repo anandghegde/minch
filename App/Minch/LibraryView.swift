@@ -73,7 +73,12 @@ struct LibraryView: View {
             )
         }
         .sheet(isPresented: $showAccount) {
-            AccountView(model: model, account: account, onDismiss: { showAccount = false })
+            AccountView(
+                model: model,
+                account: account,
+                onDismiss: { showAccount = false },
+                signOut: { Task { await model.signOut() } }
+            )
         }
     }
 
