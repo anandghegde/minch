@@ -87,4 +87,32 @@ struct AppModelReplaceAPIKeyTests {
         UserDefaults.standard.removeObject(forKey: "customDownloadFolderBookmark")
         UserDefaults.standard.removeObject(forKey: "customDownloadFolderPath")
     }
+
+    @Test
+    func ingestDroppedProvidersParsesMagnetString() async {
+        let store = StubSecretStore()
+        let model = AppModel(secretStore: store)
+
+        let magnetText = "magnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678"
+        let provider = NSItemProvider(object: magnetText as NSString)
+
+        let handled = await model.ingestDroppedProviders([provider])
+
+        #expect(handled == true)
+        #expect(model.pendingMagnet == magnetText)
+    }
+
+    @Test
+    func ingestDroppedProvidersParsesMagnetURL() async {
+        let store = StubSecretStore()
+        let model = AppModel(secretStore: store)
+
+        let magnetURL = URL(string: "magnet:?xt=urn:btih:1234567890abcdef1234567890abcdef12345678")!
+        let provider = NSItemProvider(object: magnetURL as NSURL)
+
+        let handled = await model.ingestDroppedProviders([provider])
+
+        #expect(handled == true)
+        #expect(model.pendingMagnet == magnetURL.absoluteString)
+    }
 }

@@ -309,6 +309,52 @@ final class AppModel {
         await addMagnet()
     }
 
+    func ingestDroppedProviders(_ providers: [NSItemProvider]) async -> Bool {
+        var handled = false
+        for provider in providers {
+            if provider.canLoadObject(ofClass: URL.self) {
+                let url = await withCheckedContinuation { continuation in
+                    _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                        continuation.resume(returning: url)
+                    }
+                }
+                if let url {
+                    if url.isFileURL {
+                        if url.pathExtension.lowercased() == "torrent" {
+                            do {
+                                let data = try Data(contentsOf: url)
+                                self.pendingTorrentFile = TorrentFileDraft(filename: url.lastPathComponent, data: data)
+                                await addTorrentFile()
+                                handled = true
+                            } catch {
+                                self.addError = "Failed to read .torrent file."
+                            }
+                        }
+                    } else if url.absoluteString.lowercased().hasPrefix("magnet:") {
+                        self.pendingMagnet = url.absoluteString
+                        await addMagnet()
+                        handled = true
+                    }
+                }
+            } else if provider.canLoadObject(ofClass: String.self) {
+                let text = await withCheckedContinuation { continuation in
+                    _ = provider.loadObject(ofClass: String.self) { text, _ in
+                        continuation.resume(returning: text)
+                    }
+                }
+                if let text {
+                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.lowercased().hasPrefix("magnet:") {
+                        self.pendingMagnet = trimmed
+                        await addMagnet()
+                        handled = true
+                    }
+                }
+            }
+        }
+        return handled
+    }
+
     func refresh() async {
         guard let engine = syncEngine else { return }
         isRefreshing = true
