@@ -30,6 +30,10 @@ struct MenuBarView: View {
                 quickAdd
                 Divider().background(Color.minchHairline)
                 activeList
+                if !model.inflightFileIDs.isEmpty {
+                    Divider().background(Color.minchHairline)
+                    localDownloadsList
+                }
                 Divider().background(Color.minchHairline)
                 footer
                 updaterRow
@@ -195,6 +199,20 @@ struct MenuBarView: View {
             return
         }
     }
+
+    @ViewBuilder
+    private var localDownloadsList: some View {
+        VStack(alignment: .leading, spacing: MinchSpacing.xs) {
+            Text("Local Downloads")
+                .font(.minchCaption.bold())
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 2)
+
+            ForEach(model.activeLocalDownloads) { download in
+                MenuBarLocalDownloadRow(download: download)
+            }
+        }
+    }
 }
 
 private struct MenuBarTransferRow: View {
@@ -214,6 +232,31 @@ private struct MenuBarTransferRow: View {
                     .tint(Color.minchBolt)
             }
             Text(String(format: "%.0f%%", max(0, min(row.progress, 1)) * 100))
+                .font(.minchMono)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+    }
+}
+
+private struct MenuBarLocalDownloadRow: View {
+    let download: AppModel.InflightDownload
+
+    var body: some View {
+        HStack(spacing: MinchSpacing.s) {
+            Image(systemName: "arrow.down.circle.fill")
+                .foregroundStyle(Color.minchBolt)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(download.fileName)
+                    .font(.minchCallout)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                ProgressView(value: max(0, min(download.progress, 1)))
+                    .progressViewStyle(.linear)
+                    .tint(Color.minchBolt)
+            }
+            Text(String(format: "%.0f%%", max(0, min(download.progress, 1)) * 100))
                 .font(.minchMono)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
