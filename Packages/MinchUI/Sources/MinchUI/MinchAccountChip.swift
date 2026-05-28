@@ -97,11 +97,11 @@ public struct MinchAccountChip: View {
 
     // MARK: - Test-facing helpers
 
-    public static func statusDotColor(isSubscribed: Bool) -> Color {
+    public nonisolated static func statusDotColor(isSubscribed: Bool) -> Color {
         isSubscribed ? .minchSuccess : .minchWarning
     }
 
-    static func initial(name: String) -> String {
+    nonisolated static func initial(name: String) -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let first = trimmed.first else { return "?" }
         return String(first).uppercased()
