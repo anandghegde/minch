@@ -195,9 +195,7 @@ private struct LibraryContent: View {
             VStack(spacing: 0) {
                 SearchBar(query: $searchQuery)
 
-                if selection == .active {
-                    AddMagnetBar(model: model, focusRequested: $focusMagnet)
-                }
+                AddMagnetBar(model: model, focusRequested: $focusMagnet)
 
                 if let message = model.refreshError {
                     ErrorBanner(
