@@ -4,12 +4,15 @@ import SwiftData
 import MinchKit
 import MinchUI
 import MinchPersistence
+import UniformTypeIdentifiers
 
 /// Menu bar popover content (PRD §13 sprint 6). Shows the top active transfers
 /// and a quick-add magnet field; falls back to a "sign in" affordance when
 /// the user hasn't connected their TorBox key yet.
 struct MenuBarView: View {
     @Bindable var model: AppModel
+
+    @State private var isTargeted = false
 
     @Query(
         filter: #Predicate<StoredTransfer> { $0.statusRaw != "done" },
@@ -37,8 +40,18 @@ struct MenuBarView: View {
         }
         .padding(MinchSpacing.m)
         .frame(width: 360)
-        .background(Color.minchSurfacePrimary)
+        .background(isTargeted ? Color.minchSurfaceSunken : Color.minchSurfacePrimary)
+        .overlay(
+            RoundedRectangle(cornerRadius: MinchRadius.m, style: .continuous)
+                .stroke(isTargeted ? Color.minchBolt : Color.clear, lineWidth: 2)
+        )
         .preferredColorScheme(.dark)
+        .onDrop(of: [.fileURL, .text], isTargeted: $isTargeted) { providers in
+            Task {
+                _ = await model.ingestDroppedProviders(providers)
+            }
+            return true
+        }
     }
 
     private var header: some View {
