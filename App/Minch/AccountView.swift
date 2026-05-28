@@ -20,6 +20,7 @@ struct AccountView: View {
                     planSection
                     usageSection
                     PreferencesSection(model: model)
+                    LocalPreferencesSection(model: model)
                     subscriptionsSection
                     APIKeySection(model: model)
                     signOutSection
@@ -184,14 +185,14 @@ private struct PreferencesSection: View {
         "seed_torrents",
         "allow_zipped",
         "download_speed_in_tab",
-        "show_tracker_in_torrent"
+        "show_tracker_in_torrents"
     ]
 
     private static let tooltips: [String: String] = [
         "seed_torrents": "Whether your finished torrents keep seeding back to the swarm.",
         "allow_zipped": "Let TorBox bundle multi-file downloads into a single .zip when requested.",
         "download_speed_in_tab": "Show current download speed in the browser tab / window title.",
-        "show_tracker_in_torrent": "Display tracker URLs alongside torrent details."
+        "show_tracker_in_torrents": "Display tracker URLs alongside torrent details."
     ]
 
     /// TorBox `seed_torrents` is a tri-state int (1=Auto, 2=Always, 3=Never).
@@ -415,5 +416,55 @@ private struct APIKeySection: View {
             localError = model.friendlyAPIKeyError(error)
         }
         inFlight = false
+    }
+}
+
+// MARK: - Local Preferences
+
+private struct LocalPreferencesSection: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: MinchSpacing.s) {
+            Text("Local Preferences")
+                .font(.minchHeadline)
+
+            VStack(alignment: .leading, spacing: MinchSpacing.xs) {
+                Text("Download Location")
+                    .font(.minchCaption)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: MinchSpacing.s) {
+                    Text(model.customDownloadFolderURL.path)
+                        .font(.minchCaption.monospaced())
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                        .padding(.horizontal, MinchSpacing.s)
+                        .padding(.vertical, MinchSpacing.xs)
+                        .background(
+                            RoundedRectangle(cornerRadius: MinchRadius.s, style: .continuous)
+                                .fill(Color.minchSurfaceSunken)
+                        )
+
+                    Button("Choose…") {
+                        selectFolder()
+                    }
+                    .buttonStyle(.minch(.secondary))
+                }
+            }
+        }
+    }
+
+    private func selectFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = model.customDownloadFolderURL
+
+        if panel.runModal() == .OK, let url = panel.url {
+            model.updateDownloadFolder(url)
+        }
     }
 }
