@@ -8,7 +8,7 @@ struct ClientTests {
     @Test func endpointPathsAreStable() {
         #expect(Endpoint.me.path == "/user/me")
         #expect(Endpoint.listTorrents(bypassCache: false).path == "/torrents/mylist")
-        #expect(Endpoint.addMagnet(magnet: "x").method == "POST")
+        #expect(Endpoint.addMagnet(magnet: "x", name: nil, cacheOnly: false).method == "POST")
     }
 
     @Test func listTorrentsQueryItems() {
@@ -124,6 +124,36 @@ struct ClientTests {
         #expect(await provider.currentKey() == "sk_1")
         try? await store.write("sk_2", for: SecretKey.torboxAPIKey)
         #expect(await provider.currentKey() == "sk_2")
+    }
+
+    @Test func requestDownloadURLDecodesString() async throws {
+        let json = """
+        { "success": true, "detail": "ok", "data": "https://example.com/stream.mp4" }
+        """.data(using: .utf8)!
+
+        let client = try makeClient(stub: .json(status: 200, data: json))
+        let url = try await client.requestDownloadURL(transferID: "42", fileID: "42:1")
+        #expect(url.absoluteString == "https://example.com/stream.mp4")
+    }
+
+    @Test func requestWebDownloadURLDecodesString() async throws {
+        let json = """
+        { "success": true, "detail": "ok", "data": "https://example.com/stream.mp4" }
+        """.data(using: .utf8)!
+
+        let client = try makeClient(stub: .json(status: 200, data: json))
+        let url = try await client.requestDownloadURL(transferID: "webdl:42", fileID: "webdl:42:1")
+        #expect(url.absoluteString == "https://example.com/stream.mp4")
+    }
+
+    @Test func requestStreamURLDecodesHLS() async throws {
+        let json = """
+        { "success": true, "detail": "ok", "data": { "hls_url": "https://example.com/playlist.m3u8" } }
+        """.data(using: .utf8)!
+
+        let client = try makeClient(stub: .json(status: 200, data: json))
+        let url = try await client.requestStreamURL(transferID: "42", fileID: "42:1")
+        #expect(url.absoluteString == "https://example.com/playlist.m3u8")
     }
 
     private func makeClient(stub: StubResponse) throws -> TorBoxClient {

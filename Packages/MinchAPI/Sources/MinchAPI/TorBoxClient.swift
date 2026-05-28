@@ -59,6 +59,16 @@ struct CreateTorrentResult: Decodable, Sendable {
     let queuedID: Int?
 }
 
+/// Outcome of an add call. `detail` is TorBox's human-readable envelope message
+/// (e.g. "Torrent queued", "Found Cached Torrent. Already added.") — surface it
+/// to the user so a successful-but-queued add doesn't look like a silent failure.
+public struct AddResult: Sendable {
+    public let detail: String?
+    public let queuedID: Int?
+    public let torrentID: Int?
+    public var wasQueued: Bool { queuedID != nil && torrentID == nil }
+}
+
 public actor TorBoxClient {
     public static let defaultBaseURL = URL(string: "https://api.torbox.app/v1/api")!
 
@@ -91,8 +101,9 @@ public actor TorBoxClient {
         return dtos.map { $0.toDomain() }
     }
 
-    public func addWebDownload(_ link: String, name: String? = nil) async throws {
-        _ = try await perform(.addWebDownload(link: link, name: name), decoding: CreateTorrentResult.self)
+    public func addWebDownload(_ link: String, name: String? = nil) async throws -> AddResult {
+        let (result, detail) = try await performWithDetail(.addWebDownload(link: link, name: name), decoding: CreateTorrentResult.self)
+        return AddResult(detail: detail, queuedID: result.queuedID, torrentID: result.torrentID)
     }
 
     /// Returns the list of file hosts TorBox supports for web downloads. Used
@@ -166,45 +177,40 @@ public actor TorBoxClient {
         return url
     }
 
-    /// Builds a `/torrents/requestdl?redirect=true` URL that the caller can
-    /// hand directly to AVPlayer or open in a browser; the server 302s to the
-    /// CDN URL on first access, skipping a round-trip through this client.
-    /// Returns nil if no API key is available.
-    public func directDownloadURL(transferID: String, fileID: String) async -> URL? {
+    public func requestStreamURL(transferID: String, fileID: String) async throws -> URL {
         let rawFileID = fileID.split(separator: ":").last.map(String.init) ?? fileID
-        guard let key = await keyProvider.currentKey() else { return nil }
+        let type: String
+        let id: String
         if let webID = Self.splitWebDL(transferID) {
-            var comps = URLComponents(
-                url: baseURL.appendingPathComponent("/webdl/requestdl"),
-                resolvingAgainstBaseURL: false
-            )
-            comps?.queryItems = [
-                URLQueryItem(name: "web_id", value: webID),
-                URLQueryItem(name: "file_id", value: rawFileID),
-                URLQueryItem(name: "token", value: key),
-                URLQueryItem(name: "redirect", value: "true"),
-            ]
-            return comps?.url
+            type = "webdownload"
+            id = webID
+        } else {
+            type = "torrent"
+            id = transferID
         }
-        var comps = URLComponents(
-            url: baseURL.appendingPathComponent("/torrents/requestdl"),
-            resolvingAgainstBaseURL: false
-        )
-        comps?.queryItems = [
-            URLQueryItem(name: "torrent_id", value: transferID),
-            URLQueryItem(name: "file_id", value: rawFileID),
-            URLQueryItem(name: "token", value: key),
-            URLQueryItem(name: "redirect", value: "true"),
-        ]
-        return comps?.url
+
+        struct StreamResult: Decodable, Sendable {
+            let hlsUrl: String
+        }
+
+        Self.log.debug("createStream type=\(type, privacy: .public) id=\(id, privacy: .public) file=\(rawFileID, privacy: .public)")
+        let result = try await perform(.createStream(id: id, fileID: rawFileID, type: type), decoding: StreamResult.self)
+        guard let url = URL(string: result.hlsUrl) else {
+            throw APIError.decoding("createstream returned non-URL: \(result.hlsUrl)")
+        }
+        return url
     }
 
-    public func addMagnet(_ magnet: String, name: String? = nil, cacheOnly: Bool = false) async throws {
-        _ = try await perform(.addMagnet(magnet: magnet, name: name, cacheOnly: cacheOnly), decoding: CreateTorrentResult.self)
+
+
+    public func addMagnet(_ magnet: String, name: String? = nil, cacheOnly: Bool = false) async throws -> AddResult {
+        let (result, detail) = try await performWithDetail(.addMagnet(magnet: magnet, name: name, cacheOnly: cacheOnly), decoding: CreateTorrentResult.self)
+        return AddResult(detail: detail, queuedID: result.queuedID, torrentID: result.torrentID)
     }
 
-    public func addTorrentFile(_ data: Data, filename: String, name: String? = nil, cacheOnly: Bool = false) async throws {
-        _ = try await perform(.addTorrentFile(data: data, filename: filename, name: name, cacheOnly: cacheOnly), decoding: CreateTorrentResult.self)
+    public func addTorrentFile(_ data: Data, filename: String, name: String? = nil, cacheOnly: Bool = false) async throws -> AddResult {
+        let (result, detail) = try await performWithDetail(.addTorrentFile(data: data, filename: filename, name: name, cacheOnly: cacheOnly), decoding: CreateTorrentResult.self)
+        return AddResult(detail: detail, queuedID: result.queuedID, torrentID: result.torrentID)
     }
 
     /// Returns the subset of input hashes that TorBox reports as cached. Used
@@ -262,6 +268,9 @@ public actor TorBoxClient {
     func performVoid(_ endpoint: Endpoint) async throws {
         let request = try await makeRequest(endpoint)
         Self.log.debug("→ \(request.httpMethod ?? "?", privacy: .public) \(request.url?.absoluteString ?? "?", privacy: .public)")
+        if let body = request.httpBody, let text = String(data: body, encoding: .utf8) {
+            Self.log.debug("→ body=\(text, privacy: .public)")
+        }
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw APIError.unknown(status: -1, body: "non-http response")
@@ -276,6 +285,41 @@ public actor TorBoxClient {
         if let envelope = try? JSONDecoder.minch.decode(Bare.self, from: data), envelope.success == false {
             throw APIError.validation(envelope.detail ?? envelope.error ?? "envelope reported failure")
         }
+    }
+
+    /// Variant of `perform` that also returns the envelope's `detail` string.
+    /// Used by the add endpoints so the UI can surface "Torrent queued" / "Found
+    /// Cached Torrent. Already added." messages that TorBox returns alongside a
+    /// 2xx response — otherwise a successful-but-queued add looks silent.
+    func performWithDetail<T: Decodable & Sendable>(_ endpoint: Endpoint, decoding _: T.Type) async throws -> (T, String?) {
+        let request = try await makeRequest(endpoint)
+        Self.log.debug("→ \(request.httpMethod ?? "?", privacy: .public) \(request.url?.absoluteString ?? "?", privacy: .public)")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.unknown(status: -1, body: "non-http response")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            Self.logHTTPFailure(http: http, request: request, body: body)
+            throw mapStatus(http.statusCode, body: body, response: http)
+        }
+        Self.log.debug("← HTTP \(http.statusCode, privacy: .public) \(request.url?.path ?? "?", privacy: .public) \(data.count, privacy: .public)B")
+        let envelope: Envelope<T>
+        do {
+            envelope = try JSONDecoder.minch.decode(Envelope<T>.self, from: data)
+        } catch {
+            Self.log.error("decode failed: \(String(describing: error), privacy: .public) body=\(String(data: data, encoding: .utf8) ?? "", privacy: .public)")
+            throw APIError.decoding(String(describing: error))
+        }
+        guard envelope.success, let value = envelope.data else {
+            let msg = envelope.detail ?? envelope.error ?? "envelope reported failure"
+            Self.log.error("envelope failure: \(msg, privacy: .public)")
+            throw APIError.validation(msg)
+        }
+        if let detail = envelope.detail, !detail.isEmpty {
+            Self.log.info("envelope ok detail=\(detail, privacy: .public) path=\(request.url?.path ?? "?", privacy: .public)")
+        }
+        return (value, envelope.detail)
     }
 
     func perform<T: Decodable & Sendable>(_ endpoint: Endpoint, decoding _: T.Type) async throws -> T {
@@ -303,6 +347,9 @@ public actor TorBoxClient {
             let msg = envelope.detail ?? envelope.error ?? "envelope reported failure"
             Self.log.error("envelope failure: \(msg, privacy: .public)")
             throw APIError.validation(msg)
+        }
+        if let detail = envelope.detail, !detail.isEmpty {
+            Self.log.info("envelope ok detail=\(detail, privacy: .public) path=\(request.url?.path ?? "?", privacy: .public)")
         }
         return value
     }
@@ -394,16 +441,37 @@ public actor TorBoxClient {
     }
 
     func mapStatus(_ code: Int, body: String, response: HTTPURLResponse? = nil) -> APIError {
+        let serverMessage = Self.envelopeMessage(from: body)
         switch code {
-        case 401, 403: return .auth("HTTP \(code)")
+        case 401, 403: return .auth(serverMessage ?? "HTTP \(code)")
         case 402, 429:
             let retry = response?.value(forHTTPHeaderField: "Retry-After") ?? "?"
             let remaining = response?.value(forHTTPHeaderField: "X-RateLimit-Remaining") ?? "?"
-            return .quota("HTTP \(code) retry-after=\(retry)s remaining=\(remaining)")
-        case 400, 422: return .validation(body)
-        case 500...599: return .transient(underlying: "HTTP \(code)")
-        default: return .unknown(status: code, body: body)
+            let rate = "retry-after=\(retry)s remaining=\(remaining)"
+            if let serverMessage {
+                return .quota("\(serverMessage) (\(rate))")
+            }
+            return .quota("HTTP \(code) \(rate)")
+        case 400, 422: return .validation(serverMessage ?? body)
+        case 500...599: return .transient(underlying: serverMessage ?? "HTTP \(code)")
+        default: return .unknown(status: code, body: serverMessage ?? body)
         }
+    }
+
+    /// Best-effort extraction of TorBox's envelope `detail`/`error` from an
+    /// error-response body, so non-2xx replies can show the server's specific
+    /// message ("Subscription Inactive", "Invalid Magnet Link", etc.) instead
+    /// of a generic "HTTP 4xx". Returns nil when the body is empty, isn't JSON,
+    /// or doesn't carry a usable string.
+    static func envelopeMessage(from body: String) -> String? {
+        guard let data = body.data(using: .utf8), !data.isEmpty else { return nil }
+        struct Bare: Decodable { let detail: String?; let error: String? }
+        guard let parsed = try? JSONDecoder.minch.decode(Bare.self, from: data) else { return nil }
+        let detail = parsed.detail?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let detail, !detail.isEmpty { return detail }
+        let error = parsed.error?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let error, !error.isEmpty { return error }
+        return nil
     }
 }
 

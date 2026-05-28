@@ -406,13 +406,8 @@ final class AppModel {
 
     func streamURL(transferID: String, fileID: String) async -> URL? {
         guard let client else { return nil }
-        // Prefer the direct redirect URL so AVPlayer can begin transport setup
-        // immediately instead of waiting on a JSON round-trip.
-        if let direct = await client.directDownloadURL(transferID: transferID, fileID: fileID) {
-            return direct
-        }
         do {
-            return try await client.requestDownloadURL(transferID: transferID, fileID: fileID)
+            return try await client.requestStreamURL(transferID: transferID, fileID: fileID)
         } catch let error as APIError {
             refreshError = friendlyMessage(for: error)
             return nil
@@ -452,6 +447,18 @@ final class AppModel {
             refreshError = friendlyMessage(for: error)
         } catch {
             refreshError = "Couldn't delete that transfer."
+        }
+    }
+
+    func controlTransfer(_ transferID: String, op: Endpoint.ControlOp) async {
+        guard let client else { return }
+        do {
+            try await client.controlTransfer(id: transferID, op: op)
+            await refresh()
+        } catch let error as APIError {
+            refreshError = friendlyMessage(for: error)
+        } catch {
+            refreshError = "Couldn't \(op.rawValue) that transfer: \(error.localizedDescription)"
         }
     }
 

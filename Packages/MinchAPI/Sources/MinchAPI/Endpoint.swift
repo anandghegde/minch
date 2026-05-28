@@ -14,6 +14,7 @@ public enum Endpoint: Sendable {
     case listWebDownloads(bypassCache: Bool)
     case addWebDownload(link: String, name: String?)
     case requestWebDownloadURL(webID: String, fileID: String)
+    case createStream(id: String, fileID: String, type: String)
     case controlWebDownload(id: String, op: ControlOp)
     case editWebDownload(id: String, name: String?)
     case listHosters
@@ -58,7 +59,7 @@ public enum Endpoint: Sendable {
         switch self {
         case .me, .listTorrents, .torrentInfo, .checkCached, .requestDownloadURL,
              .listWebDownloads, .requestWebDownloadURL, .listHosters,
-             .subscriptions, .stats, .meSettings: "GET"
+             .subscriptions, .stats, .meSettings, .createStream: "GET"
         case .addMagnet, .addTorrentFile, .controlTorrent,
              .addWebDownload, .controlWebDownload: "POST"
         case .editTorrent, .editWebDownload, .editSettings: "PUT"
@@ -85,6 +86,7 @@ public enum Endpoint: Sendable {
         case .stats: "/user/stats"
         case .meSettings: "/user/me"
         case .editSettings: "/user/settings/editsettings"
+        case .createStream: "/stream/createstream"
         }
     }
 
@@ -179,6 +181,7 @@ public enum Endpoint: Sendable {
             return [
                 URLQueryItem(name: "torrent_id", value: tid),
                 URLQueryItem(name: "file_id", value: fid),
+                URLQueryItem(name: "append_name", value: "true"),
             ]
         case .listWebDownloads(let bypass):
             return bypass ? [URLQueryItem(name: "bypass_cache", value: "true")] : []
@@ -186,6 +189,14 @@ public enum Endpoint: Sendable {
             return [
                 URLQueryItem(name: "web_id", value: wid),
                 URLQueryItem(name: "file_id", value: fid),
+                URLQueryItem(name: "append_name", value: "true"),
+            ]
+        case .createStream(let id, let fileID, let type):
+            return [
+                URLQueryItem(name: "id", value: id),
+                URLQueryItem(name: "file_id", value: fileID),
+                URLQueryItem(name: "type", value: type),
+                URLQueryItem(name: "chosen_audio_index", value: "0"),
             ]
         case .stats:
             return [

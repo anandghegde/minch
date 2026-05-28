@@ -24,10 +24,12 @@ struct AccountView: View {
                     subscriptionsSection
                     APIKeySection(model: model)
                     signOutSection
+                    
                     if let error = model.accountLoadError {
                         Text(error)
                             .font(.minchCaption)
                             .foregroundStyle(Color.minchDanger)
+                            .padding(.horizontal, MinchSpacing.xs)
                     }
                 }
                 .padding(MinchSpacing.xl)
@@ -44,98 +46,114 @@ struct AccountView: View {
         HStack {
             Text("Account")
                 .font(.minchTitle)
+                .foregroundStyle(.primary)
             Spacer()
             if model.isLoadingAccount {
                 ProgressView().controlSize(.small)
+                    .padding(.trailing, MinchSpacing.s)
             }
             Button("Done", action: onDismiss)
                 .buttonStyle(.minch(.ghost))
         }
-        .padding(MinchSpacing.l)
-        .background(Color.minchSurfaceCard)
+        .padding(.horizontal, MinchSpacing.xl)
+        .padding(.vertical, MinchSpacing.l)
+        .background(Color.minchSurfacePrimary)
+        .overlay(
+            VStack {
+                Spacer()
+                Divider().background(Color.minchHairline)
+            }
+        )
     }
 
     private var planSection: some View {
-        VStack(alignment: .leading, spacing: MinchSpacing.s) {
-            Text("Plan")
-                .font(.minchHeadline)
-            row("Tier", value: account.planName)
+        SettingsCard(title: "Plan Details") {
+            KeyValueRow(label: "Tier", value: account.planName)
+            
             if let email = account.email, !email.isEmpty {
-                row("Email", value: email)
+                Divider().background(Color.minchHairline)
+                KeyValueRow(label: "Email", value: email)
             }
+            
             if let isSubscribed = account.isSubscribed {
-                row("Active subscription", value: isSubscribed ? "Yes" : "No")
+                Divider().background(Color.minchHairline)
+                KeyValueRow(label: "Active subscription", value: isSubscribed ? "Yes" : "No")
             }
-            Button("Manage on torbox.app") {
-                if let url = URL(string: "https://torbox.app/subscription") {
-                    NSWorkspace.shared.open(url)
+            
+            Divider().background(Color.minchHairline)
+            HStack {
+                Spacer()
+                Button("Manage on torbox.app") {
+                    if let url = URL(string: "https://torbox.app/subscription") {
+                        NSWorkspace.shared.open(url)
+                    }
                 }
+                .buttonStyle(.minch(.ghost))
             }
-            .buttonStyle(.minch(.ghost))
+            .padding(.horizontal, MinchSpacing.l)
+            .padding(.vertical, MinchSpacing.s)
         }
     }
 
     private var usageSection: some View {
-        VStack(alignment: .leading, spacing: MinchSpacing.s) {
-            Text("Usage")
-                .font(.minchHeadline)
+        SettingsCard(title: "Usage Statistics") {
             if let g = model.stats?.general {
-                row("Downloaded", value: Self.bytes(g.totalDownloaded))
-                row("Uploaded", value: Self.bytes(g.totalUploaded))
+                KeyValueRow(label: "Downloaded", value: Self.bytes(g.totalDownloaded))
+                Divider().background(Color.minchHairline)
+                KeyValueRow(label: "Uploaded", value: Self.bytes(g.totalUploaded))
+                
                 if let ratio = g.ratio {
-                    row("Ratio", value: String(format: "%.2f", ratio))
+                    Divider().background(Color.minchHairline)
+                    KeyValueRow(label: "Ratio", value: String(format: "%.2f", ratio))
                 }
+                
                 if let items = g.totalItemsDownloaded {
-                    row("Items downloaded", value: "\(items)")
+                    Divider().background(Color.minchHairline)
+                    KeyValueRow(label: "Items downloaded", value: "\(items)")
                 }
-            } else if !model.isLoadingAccount {
-                Text("No usage data available.")
-                    .font(.minchCaption)
-                    .foregroundStyle(.secondary)
+            } else {
+                HStack {
+                    Text("No usage data available.")
+                        .font(.minchCaption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(MinchSpacing.l)
             }
         }
     }
 
     private var subscriptionsSection: some View {
-        VStack(alignment: .leading, spacing: MinchSpacing.s) {
-            Text("Subscriptions")
-                .font(.minchHeadline)
+        SettingsCard(title: "Active Subscriptions") {
             if model.subscriptions.isEmpty {
-                if !model.isLoadingAccount {
+                HStack {
                     Text("No subscriptions on file.")
                         .font(.minchCaption)
                         .foregroundStyle(.secondary)
+                    Spacer()
                 }
+                .padding(MinchSpacing.l)
             } else {
-                ForEach(model.subscriptions) { sub in
-                    subscriptionRow(sub)
+                VStack(spacing: MinchSpacing.s) {
+                    ForEach(model.subscriptions) { sub in
+                        subscriptionRow(sub)
+                    }
                 }
+                .padding(MinchSpacing.l)
             }
-        }
-    }
-
-    private var signOutSection: some View {
-        VStack(alignment: .leading, spacing: MinchSpacing.s) {
-            Text("Session")
-                .font(.minchHeadline)
-            Button("Sign out", role: .destructive) {
-                signOut()
-                onDismiss()
-            }
-            .buttonStyle(.minch(.destructive))
         }
     }
 
     @ViewBuilder
     private func subscriptionRow(_ sub: Subscription) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(sub.planName ?? "Plan")
-                    .font(.minchCaption.bold())
+                    .font(.minchBody.bold())
                 Spacer()
                 if let status = sub.status {
-                    Text(status)
-                        .font(.minchCaption)
+                    Text(status.uppercased())
+                        .font(.minchCaption.bold())
                         .foregroundStyle(status.lowercased() == "active" ? Color.minchSuccess : .secondary)
                 }
             }
@@ -150,22 +168,23 @@ struct AccountView: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(MinchSpacing.s)
-        .background(
-            RoundedRectangle(cornerRadius: MinchRadius.s, style: .continuous)
-                .fill(Color.minchSurfaceSunken)
-        )
+        .padding(MinchSpacing.m)
+        .background(Color.minchSurfaceSunken)
+        .cornerRadius(MinchRadius.s)
     }
 
-    private func row(_ label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.minchCaption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .font(.minchCaption)
-                .foregroundStyle(.primary)
+    private var signOutSection: some View {
+        SettingsCard(title: "Session") {
+            SettingsRow(
+                label: "Account Session",
+                description: "Sign out of your TorBox account on this device."
+            ) {
+                Button("Sign out", role: .destructive) {
+                    signOut()
+                    onDismiss()
+                }
+                .buttonStyle(.minch(.destructive))
+            }
         }
     }
 
@@ -180,7 +199,6 @@ struct AccountView: View {
 private struct PreferencesSection: View {
     @Bindable var model: AppModel
 
-    /// Keys we expose, in display order. Matches the previous SettingsView allowlist.
     private static let allowedKeys: [String] = [
         "seed_torrents",
         "allow_zipped",
@@ -189,13 +207,12 @@ private struct PreferencesSection: View {
     ]
 
     private static let tooltips: [String: String] = [
-        "seed_torrents": "Whether your finished torrents keep seeding back to the swarm.",
-        "allow_zipped": "Let TorBox bundle multi-file downloads into a single .zip when requested.",
-        "download_speed_in_tab": "Show current download speed in the browser tab / window title.",
-        "show_tracker_in_torrents": "Display tracker URLs alongside torrent details."
+        "seed_torrents": "Whether finished torrents keep seeding.",
+        "allow_zipped": "Bundle multi-file downloads into a single .zip.",
+        "download_speed_in_tab": "Show download speed in the browser title.",
+        "show_tracker_in_torrents": "Display tracker URLs alongside details."
     ]
 
-    /// TorBox `seed_torrents` is a tri-state int (1=Auto, 2=Always, 3=Never).
     private static let seedTorrentsOptions: [(value: Int, label: String)] = [
         (1, "Auto"),
         (2, "Always"),
@@ -203,37 +220,54 @@ private struct PreferencesSection: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: MinchSpacing.s) {
-            HStack(spacing: MinchSpacing.s) {
-                Text("Preferences")
-                    .font(.minchHeadline)
-                Spacer()
-                if model.isSavingSettings { ProgressView().controlSize(.small) }
-            }
-
+        SettingsCard(title: "TorBox Preferences") {
             if model.isLoadingSettings && model.settings == nil {
-                ProgressView().controlSize(.small)
+                HStack {
+                    Spacer()
+                    ProgressView().controlSize(.small)
+                    Spacer()
+                }
+                .padding(MinchSpacing.xl)
             } else if model.settings == nil {
-                Text(model.settingsError ?? "Couldn't load preferences.")
-                    .font(.minchCaption)
-                    .foregroundStyle(Color.minchDanger)
-                Button("Retry") { Task { await model.loadSettings() } }
-                    .buttonStyle(.minch(.ghost))
+                VStack(spacing: MinchSpacing.s) {
+                    Text(model.settingsError ?? "Couldn't load preferences.")
+                        .font(.minchCaption)
+                        .foregroundStyle(Color.minchDanger)
+                    Button("Retry") { Task { await model.loadSettings() } }
+                        .buttonStyle(.minch(.ghost))
+                }
+                .padding(MinchSpacing.l)
             } else {
-                ForEach(visibleKeys, id: \.self) { key in
+                let keys = visibleKeys
+                ForEach(0..<keys.count, id: \.self) { idx in
+                    let key = keys[idx]
+                    if idx > 0 {
+                        Divider().background(Color.minchHairline)
+                    }
                     fieldView(key: key)
                 }
+
                 if let error = model.settingsError {
                     Text(error)
                         .font(.minchCaption)
                         .foregroundStyle(Color.minchDanger)
+                        .padding(.horizontal, MinchSpacing.l)
+                        .padding(.vertical, MinchSpacing.s)
                 }
+
+                Divider().background(Color.minchHairline)
                 HStack {
                     Spacer()
-                    Button("Save") { Task { await model.saveSettings() } }
+                    if model.isSavingSettings {
+                        ProgressView().controlSize(.small)
+                            .padding(.trailing, MinchSpacing.s)
+                    }
+                    Button("Save Preferences") { Task { await model.saveSettings() } }
                         .buttonStyle(.minch(.primary))
                         .disabled(model.isSavingSettings || !model.hasSettingsChanges)
                 }
+                .padding(.horizontal, MinchSpacing.l)
+                .padding(.vertical, MinchSpacing.s)
             }
         }
         .task { await model.loadSettings() }
@@ -252,12 +286,9 @@ private struct PreferencesSection: View {
     @ViewBuilder
     private func fieldView(key: String) -> some View {
         if let value = model.settings?[key] {
-            let tooltip = Self.tooltips[key] ?? ""
+            let desc = Self.tooltips[key]
             if key == "seed_torrents" {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(label(for: key))
-                        .font(.minchCaption)
-                        .foregroundStyle(.secondary)
+                SettingsRow(label: label(for: key), description: desc) {
                     Picker("", selection: seedTorrentsBinding()) {
                         ForEach(Self.seedTorrentsOptions, id: \.value) { option in
                             Text(option.label).tag(option.value)
@@ -266,41 +297,31 @@ private struct PreferencesSection: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .controlSize(.small)
+                    .frame(width: 90)
                 }
-                .help(tooltip)
             } else {
                 switch value {
                 case .bool:
-                    HStack {
-                        Toggle(isOn: boolBinding(key)) {
-                            Text(label(for: key))
-                                .font(.minchCaption)
-                        }
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                        Spacer()
+                    SettingsRow(label: label(for: key), description: desc) {
+                        Toggle("", isOn: boolBinding(key))
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                            .labelsHidden()
                     }
-                    .help(tooltip)
                 case .string, .null:
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(label(for: key))
-                            .font(.minchCaption)
-                            .foregroundStyle(.secondary)
-                        TextField(label(for: key), text: stringBinding(key))
+                    SettingsRow(label: label(for: key), description: desc) {
+                        TextField("", text: stringBinding(key))
                             .textFieldStyle(.roundedBorder)
                             .font(.minchCaption)
+                            .frame(width: 150)
                     }
-                    .help(tooltip)
                 case .number:
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(label(for: key))
-                            .font(.minchCaption)
-                            .foregroundStyle(.secondary)
-                        TextField(label(for: key), text: numberBinding(key))
+                    SettingsRow(label: label(for: key), description: desc) {
+                        TextField("", text: numberBinding(key))
                             .textFieldStyle(.roundedBorder)
                             .font(.minchCaption)
+                            .frame(width: 150)
                     }
-                    .help(tooltip)
                 }
             }
         }
@@ -356,44 +377,55 @@ private struct APIKeySection: View {
     @State private var maskedDisplay: String = "••••••••"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: MinchSpacing.s) {
-            Text("TorBox API key")
-                .font(.minchHeadline)
-
+        SettingsCard(title: "API Authentication") {
             if isEditing {
-                SecureField("Paste your TorBox API key", text: $draftKey)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(inFlight)
-                if let localError {
-                    Text(localError)
+                VStack(alignment: .leading, spacing: MinchSpacing.s) {
+                    SecureField("Paste your TorBox API key", text: $draftKey)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(inFlight)
                         .font(.minchCaption)
-                        .foregroundStyle(Color.minchDanger)
-                }
-                HStack {
-                    Spacer()
-                    Button("Cancel") {
-                        isEditing = false
-                        draftKey = ""
-                        localError = nil
+                    
+                    if let localError {
+                        Text(localError)
+                            .font(.minchCaption)
+                            .foregroundStyle(Color.minchDanger)
                     }
-                    .buttonStyle(.minch(.ghost))
-                    .disabled(inFlight)
-                    Button("Save") { Task { await save() } }
-                        .buttonStyle(.minch(.primary))
-                        .disabled(inFlight || draftKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            } else {
-                HStack {
-                    Text(maskedDisplay)
-                        .font(.minchCaption.monospaced())
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Replace…") { isEditing = true }
+                    
+                    HStack {
+                        Spacer()
+                        Button("Cancel") {
+                            isEditing = false
+                            draftKey = ""
+                            localError = nil
+                        }
                         .buttonStyle(.minch(.ghost))
+                        .disabled(inFlight)
+                        
+                        Button("Save") { Task { await save() } }
+                            .buttonStyle(.minch(.primary))
+                            .disabled(inFlight || draftKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
                 }
-                Text("Stored locally in your macOS Keychain. Generate a new one at torbox.app/settings.")
-                    .font(.minchMetadata)
-                    .foregroundStyle(.secondary)
+                .padding(MinchSpacing.l)
+            } else {
+                SettingsRow(
+                    label: "TorBox API Key",
+                    description: "Stored locally in your macOS Keychain."
+                ) {
+                    HStack(spacing: MinchSpacing.s) {
+                        Text(maskedDisplay)
+                            .font(.minchCaption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, MinchSpacing.s)
+                            .padding(.vertical, MinchSpacing.xs)
+                            .background(Color.minchSurfaceSunken)
+                            .cornerRadius(MinchRadius.s)
+                        
+                        Button("Replace…") { isEditing = true }
+                            .buttonStyle(.minch(.secondary))
+                            .controlSize(.small)
+                    }
+                }
             }
         }
         .task { await refreshMasked() }
@@ -425,32 +457,28 @@ private struct LocalPreferencesSection: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: MinchSpacing.s) {
-            Text("Local Preferences")
-                .font(.minchHeadline)
-
-            VStack(alignment: .leading, spacing: MinchSpacing.xs) {
-                Text("Download Location")
-                    .font(.minchCaption)
-                    .foregroundStyle(.secondary)
-
+        SettingsCard(title: "Local Preferences") {
+            SettingsRow(
+                label: "Download Location",
+                description: "Where completed transfers are saved locally."
+            ) {
                 HStack(spacing: MinchSpacing.s) {
                     Text(model.customDownloadFolderURL.path)
                         .font(.minchCaption.monospaced())
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.head)
+                        .frame(maxWidth: 180)
                         .padding(.horizontal, MinchSpacing.s)
                         .padding(.vertical, MinchSpacing.xs)
-                        .background(
-                            RoundedRectangle(cornerRadius: MinchRadius.s, style: .continuous)
-                                .fill(Color.minchSurfaceSunken)
-                        )
+                        .background(Color.minchSurfaceSunken)
+                        .cornerRadius(MinchRadius.s)
 
                     Button("Choose…") {
                         selectFolder()
                     }
                     .buttonStyle(.minch(.secondary))
+                    .controlSize(.small)
                 }
             }
         }
@@ -466,5 +494,79 @@ private struct LocalPreferencesSection: View {
         if panel.runModal() == .OK, let url = panel.url {
             model.updateDownloadFolder(url)
         }
+    }
+}
+
+// MARK: - Helper Layout Components
+
+private struct SettingsCard<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: MinchSpacing.s) {
+            Text(title)
+                .font(.minchHeadline)
+                .foregroundStyle(.secondary)
+                .padding(.leading, MinchSpacing.xs)
+            
+            VStack(spacing: 0) {
+                content()
+            }
+            .background(Color.minchSurfaceCard)
+            .cornerRadius(MinchRadius.m)
+            .overlay(
+                RoundedRectangle(cornerRadius: MinchRadius.m)
+                    .stroke(Color.minchHairline, lineWidth: 1)
+            )
+        }
+    }
+}
+
+private struct SettingsRow<Content: View>: View {
+    let label: String
+    var description: String? = nil
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        HStack(spacing: MinchSpacing.m) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.minchBody)
+                    .foregroundStyle(.primary)
+                if let description {
+                    Text(description)
+                        .font(.minchCaption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer()
+            content()
+        }
+        .padding(.horizontal, MinchSpacing.l)
+        .padding(.vertical, MinchSpacing.m)
+        .frame(minHeight: 48)
+    }
+}
+
+private struct KeyValueRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.minchBody)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.minchBody)
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, MinchSpacing.l)
+        .padding(.vertical, MinchSpacing.m)
+        .frame(minHeight: 44)
     }
 }
