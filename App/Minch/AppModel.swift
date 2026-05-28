@@ -725,6 +725,34 @@ final class AppModel {
             // Swallow non-quota errors; surface only on manual refresh.
         }
     }
+
+    public struct InflightDownload: Identifiable, Sendable {
+        public var id: String { fileID }
+        public let fileID: String
+        public let fileName: String
+        public let transferName: String
+        public let progress: Double
+    }
+
+    var activeLocalDownloads: [InflightDownload] {
+        let context = container.mainContext
+        var result: [InflightDownload] = []
+        for fileID in inflightFileIDs {
+            let descriptor = FetchDescriptor<StoredTransferFile>(
+                predicate: #Predicate { $0.id == fileID }
+            )
+            if let file = try? context.fetch(descriptor).first {
+                let progress = downloadProgress[fileID] ?? 0.0
+                result.append(InflightDownload(
+                    fileID: fileID,
+                    fileName: file.name,
+                    transferName: file.transfer?.name ?? "Download",
+                    progress: progress
+                ))
+            }
+        }
+        return result.sorted(by: { $0.fileName < $1.fileName })
+    }
 }
 
 private extension URL {
