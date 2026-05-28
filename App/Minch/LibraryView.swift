@@ -785,76 +785,80 @@ private struct TransferDisclosure: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            MinchTransferRow(
-                content: makeRowContent(),
-                isExpanded: isExpanded,
-                onToggle: toggle,
-                onPlay: { file in handlePlay(file) },
-                onReveal: { file in handleReveal(file) },
-                onCopyLink: { handleCopyLink() },
-                onDelete: { confirmingDelete = true },
-                onStream: { file in handleStream(file) },
-                onDownload: { file in handleDownload(file) },
-                onCancelDownload: { file in handleCancelDownload(file) },
-                onCopyFileLink: { file in handleCopyFileLink(file) }
-            )
-            .contextMenu {
-                Button("Rename…") {
-                    renameDraft = row.name
-                    renaming = true
+        if row.modelContext == nil {
+            EmptyView()
+        } else {
+            VStack(spacing: 0) {
+                MinchTransferRow(
+                    content: makeRowContent(),
+                    isExpanded: isExpanded,
+                    onToggle: toggle,
+                    onPlay: { file in handlePlay(file) },
+                    onReveal: { file in handleReveal(file) },
+                    onCopyLink: { handleCopyLink() },
+                    onDelete: { confirmingDelete = true },
+                    onStream: { file in handleStream(file) },
+                    onDownload: { file in handleDownload(file) },
+                    onCancelDownload: { file in handleCancelDownload(file) },
+                    onCopyFileLink: { file in handleCopyFileLink(file) }
+                )
+                .contextMenu {
+                    Button("Rename…") {
+                        renameDraft = row.name
+                        renaming = true
+                    }
+                    Button(editingTags ? "Hide tag editor" : "Edit tags…") {
+                        editingTags.toggle()
+                    }
+                    Divider()
+                    Button("Delete from TorBox", role: .destructive) {
+                        confirmingDelete = true
+                    }
+                    .disabled(model.deletingTransferIDs.contains(row.id))
                 }
-                Button(editingTags ? "Hide tag editor" : "Edit tags…") {
-                    editingTags.toggle()
+                .confirmationDialog(
+                    "Delete this transfer from TorBox?",
+                    isPresented: $confirmingDelete
+                ) {
+                    Button("Delete", role: .destructive) {
+                        Task { await model.deleteTransfer(row.id) }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("\"\(row.name)\" will be removed from your TorBox cache. Already-downloaded local files will stay on disk.")
                 }
-                Divider()
-                Button("Delete from TorBox", role: .destructive) {
-                    confirmingDelete = true
-                }
-                .disabled(model.deletingTransferIDs.contains(row.id))
-            }
-            .confirmationDialog(
-                "Delete this transfer from TorBox?",
-                isPresented: $confirmingDelete
-            ) {
-                Button("Delete", role: .destructive) {
-                    Task { await model.deleteTransfer(row.id) }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("\"\(row.name)\" will be removed from your TorBox cache. Already-downloaded local files will stay on disk.")
-            }
 
-            if renaming {
-                RenameRow(
-                    draft: $renameDraft,
-                    save: {
-                        let clean = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !clean.isEmpty, clean != row.name else {
+                if renaming {
+                    RenameRow(
+                        draft: $renameDraft,
+                        save: {
+                            let clean = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !clean.isEmpty, clean != row.name else {
+                                renaming = false
+                                return
+                            }
+                            Task { await model.renameTransfer(row.id, to: clean) }
                             renaming = false
-                            return
-                        }
-                        Task { await model.renameTransfer(row.id, to: clean) }
-                        renaming = false
-                    },
-                    cancel: { renaming = false }
-                )
-                .padding(.horizontal, MinchSpacing.l)
-                .padding(.bottom, MinchSpacing.s)
-            }
+                        },
+                        cancel: { renaming = false }
+                    )
+                    .padding(.horizontal, MinchSpacing.l)
+                    .padding(.bottom, MinchSpacing.s)
+                }
 
-            if !row.tagNames.isEmpty || editingTags {
-                TagRow(
-                    tags: row.tagNames,
-                    editing: editingTags,
-                    draft: $tagDraft,
-                    add: addTag,
-                    remove: removeTag
-                )
-                .padding(.horizontal, MinchSpacing.l)
-                .padding(.bottom, MinchSpacing.s)
-            }
+                if !row.tagNames.isEmpty || editingTags {
+                    TagRow(
+                        tags: row.tagNames,
+                        editing: editingTags,
+                        draft: $tagDraft,
+                        add: addTag,
+                        remove: removeTag
+                    )
+                    .padding(.horizontal, MinchSpacing.l)
+                    .padding(.bottom, MinchSpacing.s)
+                }
 
+            }
         }
     }
 

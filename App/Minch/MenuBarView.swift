@@ -219,22 +219,26 @@ private struct MenuBarTransferRow: View {
     let row: StoredTransfer
 
     var body: some View {
-        HStack(spacing: MinchSpacing.s) {
-            MinchStatusGlyph(MinchStatusPhase(transferStatusRaw: row.statusRaw))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(row.name)
-                    .font(.minchCallout)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                ProgressView(value: max(0, min(row.progress, 1)))
-                    .progressViewStyle(.linear)
-                    .tint(Color.minchBolt)
+        if row.modelContext == nil {
+            EmptyView()
+        } else {
+            HStack(spacing: MinchSpacing.s) {
+                MinchStatusGlyph(MinchStatusPhase(transferStatusRaw: row.statusRaw))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.name)
+                        .font(.minchCallout)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    ProgressView(value: max(0, min(row.progress, 1)))
+                        .progressViewStyle(.linear)
+                        .tint(Color.minchBolt)
+                }
+                Text(String(format: "%.0f%%", max(0, min(row.progress, 1)) * 100))
+                    .font(.minchMono)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
             }
-            Text(String(format: "%.0f%%", max(0, min(row.progress, 1)) * 100))
-                .font(.minchMono)
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
         }
     }
 }
