@@ -293,6 +293,17 @@ private struct MenuBarTransferRow: View {
 
                 if isHovered {
                     HStack(spacing: MinchSpacing.m) {
+                        if let path = row.files.first(where: { $0.isDownloaded && $0.localPath != nil })?.localPath {
+                            Button {
+                                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+                            } label: {
+                                Label("Reveal", systemImage: "folder.fill")
+                                    .font(.minchCaption)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                        }
+
                         Button(action: {
                             Task {
                                 await model.controlTransfer(row.id, op: row.statusRaw == "paused" ? .resume : .pause)
