@@ -210,6 +210,12 @@ public struct MinchTransferRow: View {
                     Text("Queued")
                         .font(.minchCaption)
                         .foregroundStyle(.secondary)
+                    if content.progress > 0 {
+                        Text("·").font(.minchCaption).foregroundStyle(.tertiary)
+                        Text(MinchTransferRow.percentText(content.progress))
+                            .font(.minchCaption)
+                            .foregroundStyle(.secondary)
+                    }
                     if let q = content.queuePosition {
                         Text("·")
                             .font(.minchCaption)
@@ -225,6 +231,10 @@ public struct MinchTransferRow: View {
                     Text(MinchTransferRow.sizeText(content.sizeBytes))
                         .font(.minchCaption)
                         .foregroundStyle(.secondary)
+                    Text("·").font(.minchCaption).foregroundStyle(.tertiary)
+                    Text(MinchTransferRow.percentText(content.progress))
+                        .font(.minchCaption)
+                        .foregroundStyle(.secondary)
                     if let speed = MinchTransferRow.speedText(content.downloadSpeed) {
                         Text("·").font(.minchCaption).foregroundStyle(.tertiary)
                         Text(speed).font(.minchMono).foregroundStyle(Color.minchCurrent)
@@ -232,6 +242,10 @@ public struct MinchTransferRow: View {
                     if let eta = content.etaSeconds.flatMap({ MinchTransferRow.etaText($0) }) {
                         Text("·").font(.minchCaption).foregroundStyle(.tertiary)
                         Text(eta).font(.minchCaption).foregroundStyle(.secondary)
+                    }
+                    if let swarm = MinchTransferRow.swarmText(seeds: content.seeds, peers: content.peers, phase: content.phase) {
+                        Text("·").font(.minchCaption).foregroundStyle(.tertiary)
+                        Text(swarm).font(.minchCaption).foregroundStyle(.secondary)
                     }
                 }
 
@@ -433,10 +447,7 @@ public extension MinchTransferRow {
         return ByteCountFormatter.string(fromByteCount: bytesPerSecond, countStyle: .binary) + "/s"
     }
 
-    /// Returns "12 seeders · 3 peers" only when seeds is known and the
-    /// transfer is in an active (downloading/seeding) phase. webdl rows
-    /// pass `nil` and are skipped entirely.
-    static func swarmText(seeds: Int?, peers: Int?, phase: MinchStatusPhase) -> String? {
+    nonisolated static func swarmText(seeds: Int?, peers: Int?, phase: MinchStatusPhase) -> String? {
         guard let seeds, phase == .active else { return nil }
         var parts = ["\(seeds) seeders"]
         if let peers, peers > 0 { parts.append("\(peers) peers") }
@@ -508,6 +519,8 @@ public extension MinchTransferRow {
         queuePosition: Int?,
         errorMessage: String?,
         addedAt: Date?,
+        seeds: Int? = nil,
+        peers: Int? = nil,
         now: Date = Date()
     ) -> String {
         switch phase {
@@ -515,13 +528,16 @@ public extension MinchTransferRow {
             return sizeText(sizeBytes)
 
         case .queued:
-            if let q = queuePosition { return "Queued · #\(q)" }
-            return "Queued"
+            var parts = ["Queued"]
+            if progress > 0 { parts.append(percentText(progress)) }
+            if let q = queuePosition { parts.append("#\(q)") }
+            return parts.joined(separator: " · ")
 
         case .active:
-            var parts: [String] = [sizeText(sizeBytes)]
+            var parts: [String] = [sizeText(sizeBytes), percentText(progress)]
             if let speed = speedText(downloadSpeed) { parts.append(speed) }
             if let eta = etaSeconds.flatMap({ etaText($0) }) { parts.append(eta) }
+            if let swarm = swarmText(seeds: seeds, peers: peers, phase: phase) { parts.append(swarm) }
             return parts.joined(separator: " · ")
 
         case .paused:

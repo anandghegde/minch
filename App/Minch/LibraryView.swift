@@ -36,6 +36,7 @@ struct LibraryView: View {
                     title: selection.title,
                     count: filteredRows.count,
                     account: account,
+                    model: model,
                     openAccount: { showAccount = true }
                 )
 
@@ -621,6 +622,9 @@ private struct LibraryList: View {
             .padding(.horizontal, MinchSpacing.xxl)
             .padding(.bottom, MinchSpacing.xxl)
         }
+        .refreshable {
+            await model.refresh()
+        }
         .onChange(of: externalPlaybackTarget?.id) { _, _ in
             if let target = externalPlaybackTarget {
                 playbackTarget = target
@@ -968,6 +972,7 @@ private struct LibraryHeader: View {
     let title: String
     let count: Int
     let account: UserAccount
+    @Bindable var model: AppModel
     let openAccount: () -> Void
 
     var body: some View {
@@ -979,6 +984,23 @@ private struct LibraryHeader: View {
                 .font(.minchCallout.monospacedDigit())
                 .foregroundStyle(.secondary)
             Spacer()
+            
+            Button(action: { Task { await model.refresh() } }) {
+                if model.isRefreshing {
+                    ProgressView().controlSize(.small)
+                        .frame(width: 20, height: 20)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 20, height: 20)
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Refresh transfers")
+            .disabled(model.isRefreshing)
+            .padding(.trailing, MinchSpacing.s)
+            
             MinchAccountChip(
                 name: account.email ?? "",
                 email: account.email,

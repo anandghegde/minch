@@ -57,6 +57,11 @@ struct MenuBarView: View {
             }
             return true
         }
+        .task {
+            if case .unknown = model.state {
+                await model.bootstrap()
+            }
+        }
     }
 
     private var defaultHeader: some View {
@@ -358,6 +363,13 @@ private struct MenuBarTransferRow: View {
         }
         if let eta = row.eta, let etaStr = etaText(Int(eta)) {
             infoParts.append(etaStr)
+        }
+        if let seeds = row.seeds, row.statusRaw == "downloading" || row.statusRaw == "seeding" {
+            var swarm = "\(seeds)s"
+            if let peers = row.peers, peers > 0 {
+                swarm += "/\(peers)p"
+            }
+            infoParts.append(swarm)
         }
         return infoParts
     }

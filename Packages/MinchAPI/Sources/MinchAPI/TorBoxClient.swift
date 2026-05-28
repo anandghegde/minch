@@ -54,9 +54,9 @@ struct Envelope<T: Decodable>: Decodable {
 }
 
 struct CreateTorrentResult: Decodable, Sendable {
-    let torrentID: Int?
+    let torrentId: Int?
     let hash: String?
-    let queuedID: Int?
+    let queuedId: Int?
 }
 
 /// Outcome of an add call. `detail` is TorBox's human-readable envelope message
@@ -103,7 +103,7 @@ public actor TorBoxClient {
 
     public func addWebDownload(_ link: String, name: String? = nil) async throws -> AddResult {
         let (result, detail) = try await performWithDetail(.addWebDownload(link: link, name: name), decoding: CreateTorrentResult.self)
-        return AddResult(detail: detail, queuedID: result.queuedID, torrentID: result.torrentID)
+        return AddResult(detail: detail, queuedID: result.queuedId, torrentID: result.torrentId)
     }
 
     /// Returns the list of file hosts TorBox supports for web downloads. Used
@@ -205,12 +205,12 @@ public actor TorBoxClient {
 
     public func addMagnet(_ magnet: String, name: String? = nil, cacheOnly: Bool = false) async throws -> AddResult {
         let (result, detail) = try await performWithDetail(.addMagnet(magnet: magnet, name: name, cacheOnly: cacheOnly), decoding: CreateTorrentResult.self)
-        return AddResult(detail: detail, queuedID: result.queuedID, torrentID: result.torrentID)
+        return AddResult(detail: detail, queuedID: result.queuedId, torrentID: result.torrentId)
     }
 
     public func addTorrentFile(_ data: Data, filename: String, name: String? = nil, cacheOnly: Bool = false) async throws -> AddResult {
         let (result, detail) = try await performWithDetail(.addTorrentFile(data: data, filename: filename, name: name, cacheOnly: cacheOnly), decoding: CreateTorrentResult.self)
-        return AddResult(detail: detail, queuedID: result.queuedID, torrentID: result.torrentID)
+        return AddResult(detail: detail, queuedID: result.queuedId, torrentID: result.torrentId)
     }
 
     /// Returns the subset of input hashes that TorBox reports as cached. Used

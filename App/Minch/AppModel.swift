@@ -104,6 +104,8 @@ final class AppModel {
     }
 
     func bootstrap() async {
+        guard state == .unknown else { return }
+        state = .validating
         do {
             guard let key = try await secretStore.read(SecretKey.torboxAPIKey), !key.isEmpty else {
                 state = .signedOut(message: nil)
@@ -151,7 +153,15 @@ final class AppModel {
         isAdding = true
         addError = nil
         do {
-            try await client.addMagnet(magnet, name: name.isEmpty ? nil : name, cacheOnly: cacheOnly)
+            let result = try await client.addMagnet(magnet, name: name.isEmpty ? nil : name, cacheOnly: cacheOnly)
+            if result.torrentID == nil && result.queuedID == nil {
+                isAdding = false
+                addError = result.detail ?? "Couldn't add magnet."
+                return
+            }
+            if let detail = result.detail, !detail.isEmpty {
+                infoBanner = detail
+            }
             resetAddSheet()
             isAdding = false
             await refresh()
@@ -179,7 +189,15 @@ final class AppModel {
         isAdding = true
         addError = nil
         do {
-            try await client.addWebDownload(link, name: name.isEmpty ? nil : name)
+            let result = try await client.addWebDownload(link, name: name.isEmpty ? nil : name)
+            if result.torrentID == nil && result.queuedID == nil {
+                isAdding = false
+                addError = result.detail ?? "Couldn't add that download link."
+                return
+            }
+            if let detail = result.detail, !detail.isEmpty {
+                infoBanner = detail
+            }
             resetAddSheet()
             isAdding = false
             await refresh()
@@ -202,12 +220,20 @@ final class AppModel {
         isAdding = true
         addError = nil
         do {
-            try await client.addTorrentFile(
+            let result = try await client.addTorrentFile(
                 draft.data,
                 filename: draft.filename,
                 name: name.isEmpty ? nil : name,
                 cacheOnly: cacheOnly
             )
+            if result.torrentID == nil && result.queuedID == nil {
+                isAdding = false
+                addError = result.detail ?? "Couldn't add that .torrent file."
+                return
+            }
+            if let detail = result.detail, !detail.isEmpty {
+                infoBanner = detail
+            }
             resetAddSheet()
             isAdding = false
             await refresh()
@@ -677,16 +703,14 @@ final class AppModel {
             return "TorBox is temporarily unavailable: \(trimmed)"
         case .validation(let body):
             let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty
-                ? "TorBox didn't accept that request."
-                : "TorBox didn't accept that request: \(trimmed)"
+            return trimmed.isEmpty ? "TorBox didn't accept that request." : trimmed
         case .decoding: return "Unexpected response from TorBox."
         case .unknown(let status, let body):
             let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty {
                 return "Unexpected response (HTTP \(status))."
             }
-            return "Unexpected response (HTTP \(status)): \(trimmed)"
+            return trimmed
         }
     }
 
@@ -697,10 +721,24 @@ final class AppModel {
     private func startPolling() {
         stopPolling()
         pollTask = Task { [weak self] in
+            // Initial poll immediately when active
+            await self?.pollIfActive()
+            
             while !Task.isCancelled {
-                // 15s base interval — TorBox free-tier limits make a 5s loop
-                // burn budget you'd rather spend on user-initiated calls.
-                try? await Task.sleep(for: .seconds(15))
+                // Determine sleep interval based on whether there are active transfers.
+                // Polling at 4s when active makes progress/speed refreshes feel responsive.
+                let interval: Double
+                if let self = self {
+                    let descriptor = FetchDescriptor<StoredTransfer>(
+                        predicate: #Predicate { $0.statusRaw != "done" }
+                    )
+                    let active = (try? self.container.mainContext.fetchCount(descriptor)) ?? 0
+                    interval = active > 0 ? 4.0 : 15.0
+                } else {
+                    interval = 15.0
+                }
+                
+                try? await Task.sleep(for: .seconds(interval))
                 if Task.isCancelled { return }
                 await self?.pollIfActive()
             }

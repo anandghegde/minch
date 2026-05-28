@@ -9,12 +9,17 @@ APP="$ROOT/.build/Minch.app"
 BIN_DIR="$APP/Contents/MacOS"
 RES_DIR="$APP/Contents/Resources"
 
-echo "» swift build -c $CONFIG"
-swift build -c "$CONFIG" --package-path "$ROOT"
-
-BUILT_BIN="$ROOT/.build/arm64-apple-macosx/$CONFIG/Minch"
-if [[ ! -x "$BUILT_BIN" ]]; then
-    BUILT_BIN="$ROOT/.build/$CONFIG/Minch"
+if [ "$CONFIG" = "release" ]; then
+    echo "» Building Universal Binary (arm64 + x86_64) for Release..."
+    swift build -c release --arch arm64 --arch x86_64 --package-path "$ROOT"
+    BUILT_BIN="$ROOT/.build/apple/Products/Release/Minch"
+else
+    echo "» swift build -c $CONFIG"
+    swift build -c "$CONFIG" --package-path "$ROOT"
+    BUILT_BIN="$ROOT/.build/arm64-apple-macosx/$CONFIG/Minch"
+    if [[ ! -x "$BUILT_BIN" ]]; then
+        BUILT_BIN="$ROOT/.build/$CONFIG/Minch"
+    fi
 fi
 if [[ ! -x "$BUILT_BIN" ]]; then
     echo "Could not locate built Minch binary." >&2

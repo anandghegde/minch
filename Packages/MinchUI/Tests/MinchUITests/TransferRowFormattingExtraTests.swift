@@ -108,6 +108,24 @@ struct MetaPlainTextTests {
         #expect(s == "Queued")
     }
 
+    @Test func queuedWithPositionAndProgress() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .queued, sizeBytes: 0, downloadSpeed: 0, progress: 0.8,
+            etaSeconds: nil, queuePosition: 4, errorMessage: nil, addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s == "Queued · 80% · #4")
+    }
+
+    @Test func queuedWithProgressOnly() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .queued, sizeBytes: 0, downloadSpeed: 0, progress: 0.8,
+            etaSeconds: nil, queuePosition: nil, errorMessage: nil, addedAt: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s == "Queued · 80%")
+    }
+
     @Test func activeWithSpeedAndEta() {
         let s = MinchTransferRow.metaPlainText(
             phase: .active, sizeBytes: 2_400_000_000, downloadSpeed: 18_000_000, progress: 0.5,
@@ -125,7 +143,28 @@ struct MetaPlainTextTests {
             etaSeconds: 0, queuePosition: nil, errorMessage: nil, addedAt: nil,
             now: Date(timeIntervalSince1970: 0)
         )
-        #expect(s == "1 MB")
+        #expect(s == "1 MB · 0%")
+    }
+
+    @Test func activeWithSeedsAndPeers() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .active, sizeBytes: 2_400_000_000, downloadSpeed: 18_000_000, progress: 0.5,
+            etaSeconds: 195, queuePosition: nil, errorMessage: nil, addedAt: nil,
+            seeds: 12, peers: 3,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s.contains("12 seeders · 3 peers"))
+    }
+
+    @Test func activeWithSeedsOnly() {
+        let s = MinchTransferRow.metaPlainText(
+            phase: .active, sizeBytes: 2_400_000_000, downloadSpeed: 18_000_000, progress: 0.5,
+            etaSeconds: 195, queuePosition: nil, errorMessage: nil, addedAt: nil,
+            seeds: 12, peers: nil,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        #expect(s.contains("12 seeders"))
+        #expect(!s.contains("peers"))
     }
 
     @Test func pausedShowsSizeAndPercent() {

@@ -63,16 +63,14 @@ public struct MinchTransferProgressRing: View {
     private var trimEnd: CGFloat {
         switch phase {
         case .done: return 1
-        case .paused, .error, .active: return CGFloat(progress)
-        case .queued, .idle: return 0
+        default: return CGFloat(progress)
         }
     }
 
     private var shouldShowFill: Bool {
         switch phase {
         case .done: return true
-        case .active, .paused, .error: return progress > 0
-        case .queued, .idle: return false
+        default: return progress > 0
         }
     }
 
@@ -82,7 +80,8 @@ public struct MinchTransferProgressRing: View {
         case .done: return .minchSuccess
         case .paused: return .minchWarning
         case .error: return .minchDanger
-        case .queued, .idle: return .minchHairline
+        case .queued: return .secondary
+        case .idle: return .white.opacity(0.4)
         }
     }
 }
