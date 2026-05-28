@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import MinchAPI
 import MinchKit
+import MinchDownloads
 @testable import Minch
 
 @Suite("AppModel.replaceAPIKey")
@@ -54,5 +55,36 @@ struct AppModelReplaceAPIKeyTests {
         }
         #expect(store.stored[SecretKey.torboxAPIKey] == "old-key")
         #expect(store.writeCount == 0)
+    }
+
+    @Test
+    func downloadFolderDefaultsToDefaultDestinationRoot() async {
+        let store = StubSecretStore()
+        UserDefaults.standard.removeObject(forKey: "customDownloadFolderBookmark")
+        UserDefaults.standard.removeObject(forKey: "customDownloadFolderPath")
+
+        let model = AppModel(secretStore: store)
+        #expect(model.customDownloadFolderURL.path == DownloadManager.defaultDestinationRoot().path)
+    }
+
+    @Test
+    func downloadFolderUpdatesAndPersists() async {
+        let store = StubSecretStore()
+        UserDefaults.standard.removeObject(forKey: "customDownloadFolderBookmark")
+        UserDefaults.standard.removeObject(forKey: "customDownloadFolderPath")
+
+        let model = AppModel(secretStore: store)
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        model.updateDownloadFolder(tempDir)
+
+        #expect(model.customDownloadFolderURL.path == tempDir.path)
+        #expect(UserDefaults.standard.string(forKey: "customDownloadFolderPath") == tempDir.path)
+
+        // Check load on new instance
+        let model2 = AppModel(secretStore: store)
+        #expect(model2.customDownloadFolderURL.path == tempDir.path)
+
+        UserDefaults.standard.removeObject(forKey: "customDownloadFolderBookmark")
+        UserDefaults.standard.removeObject(forKey: "customDownloadFolderPath")
     }
 }

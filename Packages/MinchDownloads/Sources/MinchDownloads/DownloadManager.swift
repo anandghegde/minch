@@ -8,7 +8,7 @@ public final class DownloadManager: NSObject, @unchecked Sendable {
     public static let backgroundIdentifier = "app.minch.background-downloads"
 
     private let container: ModelContainer
-    private let destinationRoot: URL
+    private var destinationRoot: URL
     private let notifier: Notifier
     private let lock = NSLock()
     private var inflight: [Int: Inflight] = [:]
@@ -33,6 +33,12 @@ public final class DownloadManager: NSObject, @unchecked Sendable {
         _ = session
     }
 
+    public func setDestinationRoot(_ url: URL) {
+        lock.lock()
+        destinationRoot = url
+        lock.unlock()
+    }
+
     public static func defaultDestinationRoot() -> URL {
         let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Downloads")
@@ -47,14 +53,22 @@ public final class DownloadManager: NSObject, @unchecked Sendable {
     ) {
         let safeTransfer = sanitize(transferName)
         let safeFile = sanitize(fileName)
-        let destination = destinationRoot
+
+        lock.lock()
+        let currentRoot = destinationRoot
+        let destination = currentRoot
             .appendingPathComponent(safeTransfer, isDirectory: true)
             .appendingPathComponent(safeFile)
 
         let task = session.downloadTask(with: url)
         task.taskDescription = fileID
-        lock.lock()
-        inflight[task.taskIdentifier] = Inflight(fileID: fileID, destination: destination, displayName: fileName, task: task)
+        inflight[task.taskIdentifier] = Inflight(
+            fileID: fileID,
+            destination: destination,
+            displayName: fileName,
+            task: task,
+            rootURL: currentRoot
+        )
         lock.unlock()
         task.resume()
     }
@@ -95,6 +109,7 @@ public final class DownloadManager: NSObject, @unchecked Sendable {
         let destination: URL
         let displayName: String
         let task: URLSessionDownloadTask
+        let rootURL: URL
     }
 }
 
@@ -120,6 +135,15 @@ extension DownloadManager: URLSessionDownloadDelegate {
         guard let info = peek(taskID: downloadTask.taskIdentifier) else { return }
         let fm = FileManager.default
         let parent = info.destination.deletingLastPathComponent()
+
+        let root = info.rootURL
+        let isSecurityScoped = root.startAccessingSecurityScopedResource()
+        defer {
+            if isSecurityScoped {
+                root.stopAccessingSecurityScopedResource()
+            }
+        }
+
         try? fm.createDirectory(at: parent, withIntermediateDirectories: true)
         try? fm.removeItem(at: info.destination)
         do {

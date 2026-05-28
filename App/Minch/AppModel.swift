@@ -52,6 +52,7 @@ final class AppModel {
         guard let settings, let originalSettings else { return false }
         return settings != originalSettings
     }
+    var customDownloadFolderURL: URL = DownloadManager.defaultDestinationRoot()
 
     let container: ModelContainer
     let notifier: Notifier
@@ -76,7 +77,19 @@ final class AppModel {
         let container = (try? PersistenceController.makeContainer()) ?? Self.fallbackContainer()
         self.container = container
         self.notifier = Notifier()
-        self.downloads = DownloadManager(container: container, notifier: notifier)
+
+        var initialFolder = DownloadManager.defaultDestinationRoot()
+        if let data = UserDefaults.standard.data(forKey: "customDownloadFolderBookmark") {
+            var isStale = false
+            if let resolved = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) {
+                initialFolder = resolved
+            }
+        } else if let path = UserDefaults.standard.string(forKey: "customDownloadFolderPath") {
+            initialFolder = URL(fileURLWithPath: path)
+        }
+        self.customDownloadFolderURL = initialFolder
+
+        self.downloads = DownloadManager(container: container, destinationRoot: initialFolder, notifier: notifier)
         self.downloads.onFinish = { [weak self] fileID in
             Task { @MainActor in
                 self?.inflightFileIDs.remove(fileID)
@@ -334,6 +347,15 @@ final class AppModel {
     func cancelDownload(fileID: String) {
         downloads.cancel(fileID: fileID)
         inflightFileIDs.remove(fileID)
+    }
+
+    func updateDownloadFolder(_ url: URL) {
+        if let bookmarkData = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+            UserDefaults.standard.set(bookmarkData, forKey: "customDownloadFolderBookmark")
+        }
+        UserDefaults.standard.set(url.path, forKey: "customDownloadFolderPath")
+        self.customDownloadFolderURL = url
+        self.downloads.setDestinationRoot(url)
     }
 
     func streamURL(transferID: String, fileID: String) async -> URL? {
