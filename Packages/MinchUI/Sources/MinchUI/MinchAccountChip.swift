@@ -97,7 +97,7 @@ public struct MinchAccountChip: View {
 
     // MARK: - Test-facing helpers
 
-    static func statusDotColor(isSubscribed: Bool) -> Color {
+    public static func statusDotColor(isSubscribed: Bool) -> Color {
         isSubscribed ? .minchSuccess : .minchWarning
     }
 
