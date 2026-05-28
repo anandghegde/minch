@@ -37,6 +37,8 @@ final class AppModel {
     var downloadProgress: [String: Double] = [:]
     var copyingFileIDs: Set<String> = []
     var deletingTransferIDs: Set<String> = []
+    @ObservationIgnored
+    private var recentlyDeletedIDs = Set<String>()
     var infoBanner: String?
     var hosters: [Hoster] = []
     var subscriptions: [Subscription] = []
@@ -464,14 +466,23 @@ final class AppModel {
         guard let client else { return }
         guard !deletingTransferIDs.contains(transferID) else { return }
         deletingTransferIDs.insert(transferID)
-        defer { deletingTransferIDs.remove(transferID) }
+        recentlyDeletedIDs.insert(transferID)
+        defer {
+            deletingTransferIDs.remove(transferID)
+            Task {
+                try? await Task.sleep(for: .seconds(15))
+                recentlyDeletedIDs.remove(transferID)
+            }
+        }
         do {
             try await client.controlTransfer(id: transferID, op: .delete)
             removeLocalTransfer(id: transferID)
             infoBanner = "Removed from TorBox."
         } catch let error as APIError {
+            recentlyDeletedIDs.remove(transferID)
             refreshError = friendlyMessage(for: error)
         } catch {
+            recentlyDeletedIDs.remove(transferID)
             refreshError = "Couldn't delete that transfer."
         }
     }
@@ -549,14 +560,22 @@ final class AppModel {
     /// Shared by the initial sign-in path and `replaceAPIKey`.
     private func activate(client: TorBoxClient, signedInAs account: UserAccount) {
         self.client = client
-        self.syncEngine = SyncEngine(container: container) { [client] in
+        self.syncEngine = SyncEngine(container: container) { [client, weak self] in
             // Torrents and webdl share the SyncEngine's `[Transfer]` list and
             // its delete-absent reconciliation, so a fetch failure on either
             // surface MUST abort the merge — otherwise the failing surface's
             // rows get wiped from local storage.
             async let torrents = client.listTransfers()
             async let webdls = client.listWebDownloads()
-            return try await torrents + webdls
+            let merged = try await torrents + webdls
+            
+            if let self = self {
+                let deleted = await MainActor.run { self.recentlyDeletedIDs }
+                if !deleted.isEmpty {
+                    return merged.filter { !deleted.contains($0.id.rawValue) }
+                }
+            }
+            return merged
         }
         state = .signedIn(account)
         startPolling()
