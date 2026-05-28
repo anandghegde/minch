@@ -23,32 +23,42 @@ struct LibraryView: View {
     private var rows: [StoredTransfer]
 
     var body: some View {
-        NavigationSplitView {
-            LibrarySidebar(
-                account: account,
-                selection: $selection,
-                activeCount: rows.lazy.filter { $0.statusRaw != "done" }.count,
-                downloadedCount: rows.lazy.filter { $0.statusRaw == "done" }.count,
-                videoCount: smartCount(.videos),
-                audioCount: smartCount(.audio),
-                recentCount: recentRows.count,
-                openAccount: { showAccount = true },
-                openSettings: { NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil) },
-                addMagnet: {
-                    paletteInitialAction = .addMagnet
-                    paletteOpen = true
-                }
+        ZStack {
+            LinearGradient(
+                colors: [Color.minchSurfacePrimary, Color.minchSurfaceCard],
+                startPoint: .top,
+                endPoint: .bottom
             )
-            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
-        } detail: {
-            LibraryContent(
-                model: model,
-                selection: selection,
-                rows: filteredRows,
-                searchQuery: $searchQuery,
-                paletteTarget: $paletteRequestedTarget,
-                focusMagnet: $focusMagnet
-            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                LibraryHeader(
+                    title: selection.title,
+                    count: filteredRows.count,
+                    account: account,
+                    openAccount: { showAccount = true }
+                )
+
+                FilterBar(
+                    selection: $selection,
+                    counts: [
+                        .active: rows.lazy.filter { $0.statusRaw != "done" }.count,
+                        .downloaded: rows.lazy.filter { $0.statusRaw == "done" }.count,
+                        .videos: smartCount(.videos),
+                        .audio: smartCount(.audio),
+                        .recent: recentRows.count,
+                    ]
+                )
+
+                LibraryContent(
+                    model: model,
+                    selection: selection,
+                    rows: filteredRows,
+                    searchQuery: $searchQuery,
+                    paletteTarget: $paletteRequestedTarget,
+                    focusMagnet: $focusMagnet
+                )
+            }
         }
         .preferredColorScheme(.dark)
         .task {
@@ -163,71 +173,6 @@ struct LibraryView: View {
     }
 }
 
-// MARK: - Sidebar
-
-private struct LibrarySidebar: View {
-    let account: UserAccount
-    @Binding var selection: LibrarySection
-    let activeCount: Int
-    let downloadedCount: Int
-    let videoCount: Int
-    let audioCount: Int
-    let recentCount: Int
-    let openAccount: () -> Void
-    let openSettings: () -> Void
-    let addMagnet: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            MinchAccountChip(
-                name: account.email ?? "",
-                email: account.email,
-                planName: account.planName,
-                isSubscribed: account.isSubscribed ?? false,
-                action: openAccount
-            )
-            .padding(.top, MinchSpacing.l)
-            .padding(.horizontal, MinchSpacing.s)
-
-            Spacer().frame(height: MinchSpacing.m)
-
-            List(selection: $selection) {
-                ForEach(LibrarySection.Group.allCases, id: \.self) { group in
-                    Section(group.title) {
-                        ForEach(LibrarySection.allCases.filter { $0.group == group }) { section in
-                            MinchSidebarRow(
-                                systemImage: section.systemImage,
-                                title: section.title,
-                                count: count(for: section),
-                                isSelected: selection == section
-                            )
-                            .tag(section)
-                        }
-                    }
-                }
-            }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-
-            MinchSidebarFooter(
-                onOpenSettings: openSettings,
-                onAdd: addMagnet
-            )
-        }
-        .background(Color.minchSurfaceSidebar)
-    }
-
-    private func count(for section: LibrarySection) -> Int {
-        switch section {
-        case .active: activeCount
-        case .downloaded: downloadedCount
-        case .videos: videoCount
-        case .audio: audioCount
-        case .recent: recentCount
-        }
-    }
-}
-
 // MARK: - Content
 
 private struct LibraryContent: View {
@@ -248,8 +193,6 @@ private struct LibraryContent: View {
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                ContentHeader(title: selection.title, count: rows.count)
-
                 SearchBar(query: $searchQuery)
 
                 if selection == .active {
@@ -389,26 +332,6 @@ private struct SearchBar: View {
                 .stroke(Color.minchHairline, lineWidth: 1)
         )
         .padding(.horizontal, MinchSpacing.xxl)
-        .padding(.bottom, MinchSpacing.s)
-    }
-}
-
-private struct ContentHeader: View {
-    let title: String
-    let count: Int
-
-    var body: some View {
-        HStack(spacing: MinchSpacing.s) {
-            Text(title)
-                .font(.minchTitle)
-                .foregroundStyle(.primary)
-            Text("\(count)")
-                .font(.minchCallout.monospacedDigit())
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.horizontal, MinchSpacing.xxl)
-        .padding(.top, MinchSpacing.l)
         .padding(.bottom, MinchSpacing.s)
     }
 }
@@ -1034,6 +957,107 @@ private struct TagRow: View {
             }
             Spacer()
         }
+    }
+}
+
+// MARK: - Library Header
+
+private struct LibraryHeader: View {
+    let title: String
+    let count: Int
+    let account: UserAccount
+    let openAccount: () -> Void
+
+    var body: some View {
+        HStack(spacing: MinchSpacing.s) {
+            Text(title)
+                .font(.minchTitle)
+                .foregroundStyle(.primary)
+            Text("\(count)")
+                .font(.minchCallout.monospacedDigit())
+                .foregroundStyle(.secondary)
+            Spacer()
+            MinchAccountChip(
+                name: account.email ?? "",
+                email: account.email,
+                planName: account.planName,
+                isSubscribed: account.isSubscribed ?? false,
+                action: openAccount
+            )
+            .frame(maxWidth: 220)
+        }
+        .padding(.horizontal, MinchSpacing.xxl)
+        .padding(.top, MinchSpacing.l)
+        .padding(.bottom, MinchSpacing.s)
+    }
+}
+
+// MARK: - Filter Bar
+
+private struct FilterBar: View {
+    @Binding var selection: LibrarySection
+    let counts: [LibrarySection: Int]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: MinchSpacing.s) {
+                ForEach(LibrarySection.allCases) { section in
+                    FilterPill(
+                        title: section.title,
+                        count: counts[section] ?? 0,
+                        isSelected: selection == section,
+                        action: { selection = section }
+                    )
+                }
+            }
+            .padding(.horizontal, MinchSpacing.xxl)
+        }
+        .padding(.vertical, MinchSpacing.s)
+    }
+}
+
+private struct FilterPill: View {
+    let title: String
+    let count: Int
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: MinchSpacing.xs) {
+                Text(title)
+                    .font(.minchCaption)
+                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.minchMetadata.monospacedDigit())
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.85) : .secondary)
+                }
+            }
+            .padding(.horizontal, MinchSpacing.m)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(background)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(borderColor, lineWidth: isSelected ? 0 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+    }
+
+    private var background: Color {
+        if isSelected { return .minchBolt }
+        return isHovered ? .minchSurfaceCardHover : .minchSurfaceSunken
+    }
+
+    private var borderColor: Color {
+        isSelected ? .clear : .minchHairline
     }
 }
 
