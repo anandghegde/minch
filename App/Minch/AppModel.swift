@@ -483,6 +483,23 @@ final class AppModel {
         activate(client: candidate, signedInAs: account)
     }
 
+    /// Last 4 characters of the currently-persisted key, or nil if no key
+    /// is stored. Used by the Account sheet to render a masked display
+    /// (`••••••••abcd`) without exposing the full secret.
+    func currentAPIKeyLast4() async -> String? {
+        guard let key = try? await secretStore.read(SecretKey.torboxAPIKey),
+              key.count >= 4 else { return nil }
+        return String(key.suffix(4))
+    }
+
+    /// Maps an error from `replaceAPIKey` to a short user-facing string.
+    func friendlyAPIKeyError(_ error: Error) -> String {
+        if let api = error as? APIError {
+            return friendlyMessage(for: api)
+        }
+        return "Couldn't update key. Check your connection and try again."
+    }
+
     /// Best-effort fetch of supported file hosts. Cached for the session; used
     /// by the Add bar to render a "Supported hosts" hint.
     func loadHosters() async {

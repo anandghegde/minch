@@ -21,6 +21,7 @@ struct AccountView: View {
                     usageSection
                     PreferencesSection(model: model)
                     subscriptionsSection
+                    APIKeySection(model: model)
                     signOutSection
                     if let error = model.accountLoadError {
                         Text(error)
@@ -339,5 +340,80 @@ private struct PreferencesSection: View {
                 }
             }
         )
+    }
+}
+
+// MARK: - API Key
+
+private struct APIKeySection: View {
+    @Bindable var model: AppModel
+
+    @State private var isEditing: Bool = false
+    @State private var draftKey: String = ""
+    @State private var inFlight: Bool = false
+    @State private var localError: String?
+    @State private var maskedDisplay: String = "••••••••"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: MinchSpacing.s) {
+            Text("TorBox API key")
+                .font(.minchHeadline)
+
+            if isEditing {
+                SecureField("Paste your TorBox API key", text: $draftKey)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(inFlight)
+                if let localError {
+                    Text(localError)
+                        .font(.minchCaption)
+                        .foregroundStyle(Color.minchDanger)
+                }
+                HStack {
+                    Spacer()
+                    Button("Cancel") {
+                        isEditing = false
+                        draftKey = ""
+                        localError = nil
+                    }
+                    .buttonStyle(.minch(.ghost))
+                    .disabled(inFlight)
+                    Button("Save") { Task { await save() } }
+                        .buttonStyle(.minch(.primary))
+                        .disabled(inFlight || draftKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            } else {
+                HStack {
+                    Text(maskedDisplay)
+                        .font(.minchCaption.monospaced())
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Replace…") { isEditing = true }
+                        .buttonStyle(.minch(.ghost))
+                }
+                Text("Stored locally in your macOS Keychain. Generate a new one at torbox.app/settings.")
+                    .font(.minchMetadata)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .task { await refreshMasked() }
+    }
+
+    private func refreshMasked() async {
+        let suffix = await model.currentAPIKeyLast4() ?? ""
+        maskedDisplay = suffix.isEmpty ? "••••••••" : "••••••••\(suffix)"
+    }
+
+    private func save() async {
+        inFlight = true
+        localError = nil
+        do {
+            try await model.replaceAPIKey(draftKey)
+            isEditing = false
+            draftKey = ""
+            await refreshMasked()
+        } catch {
+            localError = model.friendlyAPIKeyError(error)
+        }
+        inFlight = false
     }
 }
