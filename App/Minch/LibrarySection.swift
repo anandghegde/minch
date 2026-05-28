@@ -1,8 +1,7 @@
 import Foundation
 
-/// Top-level sidebar selection (PRD §3.2). Sprint 5 shipped Active/Downloaded;
-/// Sprint 9 adds Smart Collections (videos, audio, recent). Settings is no
-/// longer a selectable row — it lives on the sidebar footer.
+/// Top-level filter selection in the Library window. Each case maps to a
+/// pill in the filter bar (PRD §3.2 + 2026-05-28 sidebar-removal redesign).
 enum LibrarySection: Hashable, Identifiable, CaseIterable {
     case active
     case downloaded

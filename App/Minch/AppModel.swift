@@ -436,11 +436,17 @@ final class AppModel {
     private func validate(key: String, persistOnSuccess: Bool) async throws {
         state = .validating
         let provider = StaticAPIKeyProvider(key)
-        let client = clientFactory(provider)
-        let account = try await client.me()
+        let candidate = clientFactory(provider)
+        let account = try await candidate.me()
         if persistOnSuccess {
             try await secretStore.write(key, for: SecretKey.torboxAPIKey)
         }
+        activate(client: candidate, signedInAs: account)
+    }
+
+    /// Wires up a freshly-validated client + sync engine and resumes polling.
+    /// Shared by the initial sign-in path and `replaceAPIKey`.
+    private func activate(client: TorBoxClient, signedInAs account: UserAccount) {
         self.client = client
         self.syncEngine = SyncEngine(container: container) { [client] in
             // Torrents and webdl share the SyncEngine's `[Transfer]` list and
@@ -458,6 +464,23 @@ final class AppModel {
             Task { await notifier.requestAuthorizationIfNeeded() }
         }
         Task { await loadHosters() }
+    }
+
+    /// Validates a candidate key against `/user/me`, writes it to Keychain,
+    /// swaps in the new client + sync engine, and keeps the existing local
+    /// SwiftData rows. Throws on validation failure or empty input — the
+    /// previous client and stored key are left untouched in that case.
+    func replaceAPIKey(_ newKey: String) async throws {
+        let trimmed = newKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw APIError.validation("API key cannot be empty.")
+        }
+        let provider = StaticAPIKeyProvider(trimmed)
+        let candidate = clientFactory(provider)
+        let account = try await candidate.me()
+        try await secretStore.write(trimmed, for: SecretKey.torboxAPIKey)
+        stopPolling()
+        activate(client: candidate, signedInAs: account)
     }
 
     /// Best-effort fetch of supported file hosts. Cached for the session; used
@@ -542,19 +565,36 @@ final class AppModel {
 
     private func friendlyMessage(for error: APIError) -> String {
         switch error {
-        case .auth: return "That key was rejected by TorBox. Double-check it and try again."
+        case .auth(let detail):
+            let trimmed = detail.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty || trimmed.hasPrefix("HTTP ") {
+                return "That key was rejected by TorBox. Double-check it and try again."
+            }
+            return "TorBox rejected this request: \(trimmed)"
         case .quota(let detail):
             // The client packs `retry-after=Ns remaining=M` into the detail so
-            // we can show the user roughly how long to wait.
+            // we can show the user roughly how long to wait. When TorBox also
+            // returned a `detail` string, it's prepended in front of the rate
+            // info — surface the whole thing.
             return "TorBox is rate-limiting requests (\(detail)). Wait a moment and retry."
-        case .transient: return "TorBox is temporarily unavailable. Try again shortly."
+        case .transient(let detail):
+            let trimmed = detail.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty || trimmed.hasPrefix("HTTP ") {
+                return "TorBox is temporarily unavailable. Try again shortly."
+            }
+            return "TorBox is temporarily unavailable: \(trimmed)"
         case .validation(let body):
             let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty
                 ? "TorBox didn't accept that request."
                 : "TorBox didn't accept that request: \(trimmed)"
         case .decoding: return "Unexpected response from TorBox."
-        case .unknown(let status, _): return "Unexpected response (HTTP \(status))."
+        case .unknown(let status, let body):
+            let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                return "Unexpected response (HTTP \(status))."
+            }
+            return "Unexpected response (HTTP \(status)): \(trimmed)"
         }
     }
 

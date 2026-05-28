@@ -27,5 +27,14 @@ let package = Package(
             path: "App/Minch",
             exclude: ["Info.plist", "AppIcon.icns"]
         ),
+        .testTarget(
+            name: "MinchTests",
+            dependencies: [
+                "Minch",
+                .product(name: "MinchAPI", package: "MinchAPI"),
+                .product(name: "MinchKit", package: "MinchKit"),
+            ],
+            path: "App/MinchTests"
+        ),
     ]
 )
